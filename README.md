@@ -23,5 +23,11 @@ The goal is to make it easier for students to install tools, follow style guides
    ```bash
    git clone https://github.com/cMoOW/Cosi10a-CodingExtensions.git
    cd Cosi10a-CodingExtensions
+   ```
+
+**Install dependencies**
+   ```bash
+   npm install
+   ```
 
 
