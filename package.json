@@ -1,8 +1,9 @@
 {
-  "name": "test",
-  "displayName": "test",
-  "description": "",
+  "name": "python-lint",
+  "displayName": "Python Linter",
+  "description": "A work in progress version of the our python linter extension",
   "version": "0.0.1",
+  "publisher": "Apoorva"
   "engines": {
     "vscode": "^1.104.0"
   },
