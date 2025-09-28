@@ -15,14 +15,16 @@
   ],
   "main": "./extension.js",
   "contributes": {
-    "commands": [{
-      "command": "test.helloWorld",
-      "title": "Hello World"
-    },
-  {
-    "command":"test.logSelection",
-    "title":"Log selected text"
-  }]
+    "commands": [
+      {
+        "command": "test.helloWorld",
+        "title": "Hello World"
+      },
+      {
+        "command": "test.logSelection",
+        "title": "Log selected text"
+      }
+    ]
   },
   "scripts": {
     "lint": "eslint .",
@@ -30,11 +32,15 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.104.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "eslint": "^9.34.0",
+    "@types/vscode": "^1.104.0",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.34.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "nodemailer": "^7.0.6"
   }
 }
