@@ -15,20 +15,29 @@ function activate(context) {
 	console.log('Congratulations, your extension "test" is now active!');
 	vscode.window.showInformationMessage('this extension is now active!');
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
+	
 	const disposable = vscode.commands.registerCommand('test.helloWorld', function () {
 		// The code you place here will be executed every time your command is executed
 
 		// Display a message box to the user
-		vscode.window.showInformationMessage('This is proof of our work so far');
-        // Send the email when the command is executed
-        sendEmailCommandHandler();
+		vscode.window.showInformationMessage('Hello world has been run');
+    // Send the email when the command is executed
+    sendEmailCommandHandler();
+    context.subscriptions.push(disposable);
 	});
 
-	context.subscriptions.push(disposable);
-    // Activate the highlighter functionality
+  const rightClickDisposable = vscode.commands.registerCommand('test.rightClickCommand', function () {
+    // Get the active text editor
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+        const selection = editor.selection;
+        const selectedText = editor.document.getText(selection);
+        console.log('Selected text:', selectedText);
+        vscode.window.showInformationMessage(`Selected text logged to console: ${selectedText}`);
+    }
+    context.subscriptions.push(rightClickDisposable);
+  });
+
     activateHighlighter(context);
 }
 
@@ -38,7 +47,6 @@ function activate(context) {
  */
 async function sendEmailCommandHandler() {
   try {
-    
     // 1. Prompt for the email body
     const body = await vscode.window.showInputBox({
       prompt: "Enter the email body (can be HTML)",
@@ -46,7 +54,7 @@ async function sendEmailCommandHandler() {
     });
     if (!body) return vscode.window.showInformationMessage('Email sending cancelled.');
 
-    // 4. Call the email service with all the user's input
+    // 2. Call the email service with all the user's input
     const messageId = await sendHelloEmail(body);
 
     console.log('Email sent successfully. Message ID:', messageId);

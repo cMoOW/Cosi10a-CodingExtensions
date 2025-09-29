@@ -11,6 +11,7 @@
   ],
   "activationEvents": [
     "onStartupFinished",
+    "test.rightClickCommand",
     "*"
   ],
   "main": "./extension.js",
@@ -23,8 +24,20 @@
       {
         "command": "test.logSelection",
         "title": "Log selected text"
+      },
+      {
+        "command": "test.rightClickCommand",
+        "title": "Right Click Command"
       }
     ]
+    ,"menus": {
+      "editor/context": [
+        {
+          "command": "test.rightClickCommand",
+          "when": "editorHasSelection"
+        }
+      ]
+    }
   },
   "scripts": {
     "lint": "eslint .",
