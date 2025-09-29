@@ -1,7 +1,7 @@
 {
   "name": "python-lint",
   "displayName": "Python Linter",
-  "description": "A work in progress version of the our python linter extension",
+  "description": "A work in progress version of a python linter extension",
   "version": "0.0.1",
   "publisher": "Apoorva",
   "engines": {
