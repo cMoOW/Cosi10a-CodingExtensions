@@ -12,7 +12,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
  * This function returns a promise that resolves on success or rejects on failure.
  * @returns {Promise<string>} A promise that resolves with the message ID of the sent email.
  */
-async function sendHelloEmail() {
+async function sendHelloEmail(body) {
     // DEBUG: Log the environment variables to check if they are loaded
   console.log('--- Checking Credentials ---');
   console.log('Email User:', process.env.EMAIL_USER);
@@ -33,8 +33,8 @@ async function sendHelloEmail() {
     from: `"VS Code Extension" <${process.env.EMAIL_USER}>`,
     to: process.env.EMAIL_SEND, // The email address to send to
     subject: 'Hello World Command Executed! 🚀',
-    text: 'The "Hello World" command was successfully run from your VS Code extension.',
-    html: '<h3>Hello World Command Executed!</h3><p>The "Hello World" command was successfully run from your VS Code extension at ' + new Date().toLocaleString() + '.</p>',
+    text:  body.replace(/<[^>]*>?/gm, ''), // Create a plain text version from HTML,
+    html: '<h3>Hello World Command Executed!</h3><p>' + body + '</p>',
   };
 
   // 3. Send the email and return the result

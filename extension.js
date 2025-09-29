@@ -24,19 +24,40 @@ function activate(context) {
 		// Display a message box to the user
 		vscode.window.showInformationMessage('This is proof of our work so far');
         // Send the email when the command is executed
-        sendHelloEmail()
-            .then((messageId) => {
-                vscode.window.showInformationMessage(`Email sent successfully! Message ID: ${messageId}`);
-            })
-            .catch((error) => {
-                vscode.window.showErrorMessage(`Failed to send email: ${error.message}`);
-            });
+        sendEmailCommandHandler();
 	});
 
 	context.subscriptions.push(disposable);
     // Activate the highlighter functionality
     activateHighlighter(context);
 }
+
+/**
+ * Handles the logic for the "helloWorld" command.
+ * It prompts the user for email details and calls the email service.
+ */
+async function sendEmailCommandHandler() {
+  try {
+    
+    // 1. Prompt for the email body
+    const body = await vscode.window.showInputBox({
+      prompt: "Enter the email body (can be HTML)",
+      placeHolder: "Type your message here."
+    });
+    if (!body) return vscode.window.showInformationMessage('Email sending cancelled.');
+
+    // 4. Call the email service with all the user's input
+    const messageId = await sendHelloEmail(body);
+
+    console.log('Email sent successfully. Message ID:', messageId);
+    vscode.window.showInformationMessage(`Email successfully sent! Message ID: ${messageId}`);
+
+  } catch (error) {
+    console.error('Error sending email:', error);
+    vscode.window.showErrorMessage('Failed to send email: ' + error.message);
+  }
+}
+
 
 // This method is called when your extension is deactivated
 function deactivate() {}
