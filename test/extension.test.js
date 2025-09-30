@@ -1,3 +1,6 @@
+/**
+ * This file is used to test the extensions. Tests functionality of the main extension.js file. Unit tests to ensure extensions work correctly. 
+ */
 const assert = require('assert');
 
 // You can import and use all API from the 'vscode' module
