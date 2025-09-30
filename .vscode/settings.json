@@ -1,0 +1,8 @@
+{
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.pylintArgs": [
+        "--load-plugins=linters.snake_case_checker"
+    ],
+    "python.linting.lintOnSave": true
+}
