@@ -25,7 +25,7 @@ function activate(context) {
     sendEmailCommandHandler();
     context.subscriptions.push(disposable);
 	});
-
+ 
   const rightClickDisposable = vscode.commands.registerCommand('test.rightClickCommand', function () {
     // Get the active text editor
     const editor = vscode.window.activeTextEditor;
