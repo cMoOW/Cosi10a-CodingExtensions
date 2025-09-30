@@ -27,11 +27,11 @@ async function sendHelloEmail(body) {
       pass: process.env.EMAIL_PASS,
     },
   });
-
+ 
   // 2. Define the email's content
   const mailOptions = {
     from: `"VS Code Extension" <${process.env.EMAIL_USER}>`,
-    to: process.env.EMAIL_SEND, // The email address to send to
+    to: process.env.EMAIL_SEND, // The email address toclea send to
     subject: 'Hello World Command Executed! 🚀',
     text:  body.replace(/<[^>]*>?/gm, ''), // Create a plain text version from HTML,
     html: '<h3>Hello World Command Executed!</h3><p>' + body + '</p>',
