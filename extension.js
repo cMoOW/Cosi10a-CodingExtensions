@@ -55,11 +55,16 @@ async function sendEmailCommandHandler(highlightedText, documentText) {
       prompt: "Enter your email",
       placeHolder: "Type your email here..."
     });
+    const message = await vscode.window.showInputBox({
+      prompt: "Enter your message",
+      placeHolder: "Type your message here..."
+    });
     // Call the email service with all the user's input
-    const messageId = await sendHelloEmail(highlightedText, documentText, email);
+    const messageId = await sendHelloEmail(highlightedText, documentText, email, message);
 
     console.log('Email sent successfully. Message ID:', messageId);
-    vscode.window.showInformationMessage(`Email successfully sent! Message ID: ${messageId}`);
+    // vscode.window.showInformationMessage(`Email successfully sent! Message ID: ${messageId}`);
+    vscode.window.showInformationMessage('Email successfully sent!');
 
   } catch (error) {
     console.error('Error sending email:', error);
