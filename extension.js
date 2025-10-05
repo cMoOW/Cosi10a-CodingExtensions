@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
 // Import the highlighter functionality from the new file
-const { activateHighlighter } = require('./src/highlight.js');
+//const { activateHighlighter } = require('./src/highlight.js');
 const { sendHelloEmail } = require('./src/send-email.js');
 
 /**
@@ -27,12 +27,14 @@ function activate(context) {
  
   const rightClickDisposable = vscode.commands.registerCommand('test.rightClickCommand', function () {
     // Get the active text editor
+    
     const editor = vscode.window.activeTextEditor;
     if (editor) {
         const selection = editor.selection;
         const selectedText = editor.document.getText(selection);
         console.log('Selected text:', selectedText);
         vscode.window.showInformationMessage(`Selected text logged to console: ${selectedText}`);
+        
         sendEmailCommandHandler(selectedText, editor.document.getText());
     }
     
@@ -48,9 +50,13 @@ function activate(context) {
  */
 async function sendEmailCommandHandler(highlightedText, documentText) {
   try {
-
+     // 1. Prompt for the email body
+    const email = await vscode.window.showInputBox({
+      prompt: "Enter your email",
+      placeHolder: "Type your email here..."
+    });
     // Call the email service with all the user's input
-    const messageId = await sendHelloEmail(highlightedText, documentText);
+    const messageId = await sendHelloEmail(highlightedText, documentText, email);
 
     console.log('Email sent successfully. Message ID:', messageId);
     vscode.window.showInformationMessage(`Email successfully sent! Message ID: ${messageId}`);
