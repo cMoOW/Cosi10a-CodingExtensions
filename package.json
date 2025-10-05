@@ -11,8 +11,7 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "test.rightClickCommand",
-    "*"
+    "test.rightClickCommand"
   ],
   "main": "./extension.js",
   "contributes": {
