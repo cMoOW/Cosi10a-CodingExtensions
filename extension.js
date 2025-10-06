@@ -55,10 +55,12 @@ async function sendEmailCommandHandler(highlightedText, documentText) {
       prompt: "Enter your email",
       placeHolder: "Type your email here..."
     });
+    if (!email) return vscode.window.showInformationMessage('Email sending cancelled.');
     const message = await vscode.window.showInputBox({
       prompt: "Enter your message",
       placeHolder: "Type your message here..."
     });
+    if (!message) return vscode.window.showInformationMessage('Email sending cancelled.');
     // Call the email service with all the user's input
     const messageId = await sendHelloEmail(highlightedText, documentText, email, message);
 
