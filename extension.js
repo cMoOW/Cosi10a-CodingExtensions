@@ -25,7 +25,7 @@ function activate(context) {
     context.subscriptions.push(disposable);
 	});
  
-  const rightClickDisposable = vscode.commands.registerCommand('test.rightClickCommand', function () {
+  const emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
     // Get the active text editor
     
     const editor = vscode.window.activeTextEditor;
@@ -38,7 +38,7 @@ function activate(context) {
         sendEmailCommandHandler(selectedText, editor.document.getText());
     }
     
-    context.subscriptions.push(rightClickDisposable);
+    context.subscriptions.push(emailCodeDisposable);
   });
   // highlight TODO: Uncomment this line to enable the highlighter functionality
     //activateHighlighter(context);
