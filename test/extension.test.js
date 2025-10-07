@@ -91,3 +91,5 @@ suite('Extension Test Suite', () => {
 		assert(typeof extension.deactivate === 'function', 'deactivate should be a function');
 	});
 });
+
+

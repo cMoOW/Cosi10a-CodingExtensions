@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # VS Code test files
 .vscode-test/
 
@@ -43,3 +44,7 @@ jspm_packages/
 .Trashes
 ehthumbs.db
 Thumbs.db
+=======
+.env
+.DS_Store
+>>>>>>> origin/email3

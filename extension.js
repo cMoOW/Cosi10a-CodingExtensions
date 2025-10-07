@@ -1,6 +1,9 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
+// Import the highlighter functionality from the new file
+//const { activateHighlighter } = require('./src/highlight.js');
+const { sendHelloEmail } = require('./src/send-email.js');
 const { getNoteFromUser } = require('./PostIt/noteInput');
 
 // Create a decoration type - this is like defining a CSS class
@@ -25,16 +28,67 @@ function activate(context) {
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "test" is now active!');
-	vscode.window.showInformationMessage('this extension is now active!');
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
+	vscode.window.showInformationMessage('This extension is now active!');
+	
 	const disposable = vscode.commands.registerCommand('test.helloWorld', function () {
 		// The code you place here will be executed every time your command is executed
 
 		// Display a message box to the user
-		vscode.window.showInformationMessage('This is proof of our work so far');
+		vscode.window.showInformationMessage('Hello world has been run');
+    // Send the email when the command is executed
+   // sendEmailCommandHandler();
+    context.subscriptions.push(disposable);
 	});
+ 
+  const emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
+    // Get the active text editor
+    
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+        const selection = editor.selection;
+        const selectedText = editor.document.getText(selection);
+        console.log('Selected text:', selectedText);
+        vscode.window.showInformationMessage(`Selected text logged to console: ${selectedText}`);
+        
+        sendEmailCommandHandler(selectedText, editor.document.getText());
+    }
+    
+    context.subscriptions.push(emailCodeDisposable);
+  });
+  // highlight TODO: Uncomment this line to enable the highlighter functionality
+    //activateHighlighter(context);
+}
+
+/**
+ * Handles the logic for the "helloWorld" command.
+ * It prompts the user for email details and calls the email service.
+ */
+async function sendEmailCommandHandler(highlightedText, documentText) {
+  try {
+     // 1. Prompt for the email body
+    const email = await vscode.window.showInputBox({
+      prompt: "Enter your email",
+      placeHolder: "Type your email here..."
+    });
+    if (!email) return vscode.window.showInformationMessage('Email sending cancelled.');
+    const message = await vscode.window.showInputBox({
+      prompt: "Enter your message",
+      placeHolder: "Type your message here..."
+    });
+    if (!message) return vscode.window.showInformationMessage('Email sending cancelled.');
+    // Call the email service with all the user's input
+    const messageId = await sendHelloEmail(highlightedText, documentText, email, message);
+
+    console.log('Email sent successfully. Message ID:', messageId);
+    // vscode.window.showInformationMessage(`Email successfully sent! Message ID: ${messageId}`);
+    vscode.window.showInformationMessage('Email successfully sent!');
+
+  } catch (error) {
+    console.error('Error sending email:', error);
+    vscode.window.showErrorMessage('Failed to send email: ' + error.message);
+  }
+}
+
 
 
 	let codeEditor = vscode.commands.registerCommand('test.logSelection', () => {
