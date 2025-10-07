@@ -51,4 +51,4 @@ async function sendHelloEmail(highlightedText,body, email, message) {
 // Export the function so it can be used in other files
 module.exports = {
   sendHelloEmail,
-};
+}; 
