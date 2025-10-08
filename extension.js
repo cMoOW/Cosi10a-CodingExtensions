@@ -35,6 +35,7 @@ function activate(context) {
 		vscode.window.showInformationMessage('This is proof of our work so far');
 	});
 
+
 	let codeEditor = vscode.commands.registerCommand('test.logSelection', () => {
         // Get the active text editor
         const editor = vscode.window.activeTextEditor;
@@ -53,9 +54,19 @@ function activate(context) {
         }
     });
 
+    //handles adding a note 
+    let addNoteCommand = vscode.commands.registerCommand('test.addNote', async () => {
+        const note = await getNoteFromUser();
+        if(note){
+            console.log(`Note added: ${note}`);
+        }
+    });
+
+    //Register all commands 
     context.subscriptions.push(codeEditor);
-	
 	context.subscriptions.push(disposable);
+    context.subscriptions.push(addNoteCommand);
+
 	// Create the decoration type
     todoDecorationType = vscode.window.createTextEditorDecorationType({
         backgroundColor: 'rgba(255, 255, 0, 0.3)',
