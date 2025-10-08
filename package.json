@@ -19,8 +19,12 @@
     "commands": [{
       "command": "test.helloWorld",
       "title": "Hello World"
+    }, 
+    {
+      "command":"test.addNote",
+      "title":"Add Note"
     },
-  {
+    {
     "command":"test.logSelection",
     "title":"Log selected text"
   }]
