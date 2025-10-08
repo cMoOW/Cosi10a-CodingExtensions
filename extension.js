@@ -4,7 +4,7 @@ const vscode = require('vscode');
 // Import the highlighter functionality from the new file
 //const { activateHighlighter } = require('./src/highlight.js');
 const { sendHelloEmail } = require('./src/send-email.js');
-const { getNoteFromUser } = require('./PostIt/noteInput');
+const { NoteManager } = require('./PostIt/noteManager');
 
 // Create a decoration type - this is like defining a CSS class
 let todoDecorationType = vscode.window.createTextEditorDecorationType({
