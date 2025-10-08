@@ -26,11 +26,11 @@ suite('Extension Test Suite', () => {
 	});
 
 	//TEST 2: PostIt Module Exists
-	test('PostIt noteInput module should be importable', () => {
+	test('PostIt NoteManager module should be importable', () => {
 		// This test ensures the PostIt module exists and can be imported
 		// If this fails, Add Note command will crash. (test for addnote)
-		const { getNoteFromUser } = require('../PostIt/noteInput');
-		assert(typeof getNoteFromUser === 'function', 'getNoteFromUser should be a function');
+		const { NoteManager } = require('../PostIt/noteManager');
+		assert(typeof NoteManager === 'function', 'NoteManager should be a class/function');
 	});
 
 	//TEST 3: Commands Are Registered
@@ -42,41 +42,46 @@ suite('Extension Test Suite', () => {
 		// Test that your commands exist
 		assert(commands.includes('test.helloWorld'), 'Hello World command should be registered');
 		assert(commands.includes('test.addNote'), 'Add Note command should be registered');
-		assert(commands.includes('test.logSelection'), 'Log Selection command should be registered');
+		assert(commands.includes('test.viewNotes'), 'View Notes command should be registered');
+		assert(commands.includes('test.emailCodeSnippet'), 'Email Code Snippet command should be registered');
 	});
 
-	// TEST 4: PostIt Function Handles Empty Input
-	test('getNoteFromUser should handle empty input gracefully', async () => {
-		// Test in case the PostIt function doesn't crash on empty input
-		// Users will cancel the input box or enter nothing
-		const { getNoteFromUser } = require('../PostIt/noteInput');
+	// TEST 4: NoteManager Can Be Instantiated
+	test('NoteManager should be instantiable with context', () => {
+		// Test that NoteManager can be created (core functionality)
+		const { NoteManager } = require('../PostIt/noteManager');
 		
-		// This is for running an empty text input 
-		const originalShowInputBox = vscode.window.showInputBox;
-		vscode.window.showInputBox = async () => '';
+		// Mock context object
+		const mockContext = {
+			globalState: {
+				get: () => [],
+				update: () => Promise.resolve()
+			},
+			subscriptions: []
+		};
 		
-		const result = await getNoteFromUser();
-		assert.strictEqual(result, null, 'Should return null for empty input');
-		
-		// Restore original function
-		vscode.window.showInputBox = originalShowInputBox;
+		const noteManager = new NoteManager(mockContext);
+		assert(noteManager, 'NoteManager should be instantiable');
+		assert(typeof noteManager.addNote === 'function', 'addNote should be a function');
+		assert(typeof noteManager.viewAllNotes === 'function', 'viewAllNotes should be a function');
+		assert(typeof noteManager.getNotesCount === 'function', 'getNotesCount should be a function');
 	});
 
-	// TEST 5: PostIt Function Handles Valid Input
-	test('getNoteFromUser should return note when provided', async () => {
-		// This test ensures your PostIt function works with valid input
-		// This is the core functionality - it must work!
-		const { getNoteFromUser } = require('../PostIt/noteInput');
+	// TEST 5: NoteManager Handles Empty Notes
+	test('NoteManager should handle empty notes list', () => {
+		// Test that NoteManager works with no existing notes
+		const { NoteManager } = require('../PostIt/noteManager');
 		
-		// Mock the input box to return a test note
-		const originalShowInputBox = vscode.window.showInputBox;
-		vscode.window.showInputBox = async () => 'Test note content';
+		const mockContext = {
+			globalState: {
+				get: () => [], // Empty notes array
+				update: () => Promise.resolve()
+			},
+			subscriptions: []
+		};
 		
-		const result = await getNoteFromUser();
-		assert.strictEqual(result, 'Test note content', 'Should return the note content');
-		
-		// Restore original function
-		vscode.window.showInputBox = originalShowInputBox;
+		const noteManager = new NoteManager(mockContext);
+		assert.strictEqual(noteManager.getNotesCount(), 0, 'Should return 0 for empty notes');
 	});
 
 	// Test 6: Extension Doesn't Crash on Invalid Input
