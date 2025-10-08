@@ -6,17 +6,6 @@ const vscode = require('vscode');
 const { sendHelloEmail } = require('./src/send-email.js');
 const { NoteManager } = require('./PostIt/noteManager');
 
-// Create a decoration type - this is like defining a CSS class
-let todoDecorationType = vscode.window.createTextEditorDecorationType({
-    backgroundColor: 'rgba(255, 255, 0, 0.3)', // Yellow background
-    borderColor: 'rgba(255, 255, 0, 0.5)',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    overviewRulerColor: 'yellow', // Shows a mark in the overview ruler
-    overviewRulerLane: vscode.OverviewRulerLane.Right,
-});
-
-
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 
@@ -30,33 +19,58 @@ function activate(context) {
 	console.log('Congratulations, your extension "test" is now active!');
 	vscode.window.showInformationMessage('This extension is now active!');
 	
+	// Initialize Note Manager
+	const noteManager = new NoteManager(context);
+
+	// Create status bar item for notes
+	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+	statusBarItem.command = 'test.viewNotes';
+	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+	statusBarItem.tooltip = 'Click to view your Post-It notes';
+	statusBarItem.show();
+	context.subscriptions.push(statusBarItem);
+
 	const disposable = vscode.commands.registerCommand('test.helloWorld', function () {
 		// The code you place here will be executed every time your command is executed
 
 		// Display a message box to the user
 		vscode.window.showInformationMessage('Hello world has been run');
-    // Send the email when the command is executed
-   // sendEmailCommandHandler();
-    context.subscriptions.push(disposable);
+	});
+
+	// Add Note Command - using new NoteManager
+	let addNoteCommand = vscode.commands.registerCommand('test.addNote', async () => {
+		await noteManager.addNote();
+		// Update status bar count
+		statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+	});
+
+	// View Notes Command - NEW!
+	let viewNotesCommand = vscode.commands.registerCommand('test.viewNotes', async () => {
+		await noteManager.viewAllNotes();
 	});
  
-  const emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
-    // Get the active text editor
-    
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-        const selection = editor.selection;
-        const selectedText = editor.document.getText(selection);
-        console.log('Selected text:', selectedText);
-        vscode.window.showInformationMessage(`Selected text logged to console: ${selectedText}`);
-        
-        sendEmailCommandHandler(selectedText, editor.document.getText());
-    }
-    
-    context.subscriptions.push(emailCodeDisposable);
-  });
-  // highlight TODO: Uncomment this line to enable the highlighter functionality
-    //activateHighlighter(context);
+	const emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
+		// Get the active text editor
+		
+		const editor = vscode.window.activeTextEditor;
+		if (editor) {
+			const selection = editor.selection;
+			const selectedText = editor.document.getText(selection);
+			console.log('Selected text:', selectedText);
+			vscode.window.showInformationMessage(`Selected text logged to console: ${selectedText}`);
+			
+			sendEmailCommandHandler(selectedText, editor.document.getText());
+		}
+	});
+
+	// Register all commands
+	context.subscriptions.push(disposable);
+	context.subscriptions.push(addNoteCommand);
+	context.subscriptions.push(viewNotesCommand);
+	context.subscriptions.push(emailCodeDisposable);
+
+	// highlight TODO: Uncomment this line to enable the highlighter functionality
+	//activateHighlighter(context);
 }
 
 /**
@@ -87,109 +101,6 @@ async function sendEmailCommandHandler(highlightedText, documentText) {
     console.error('Error sending email:', error);
     vscode.window.showErrorMessage('Failed to send email: ' + error.message);
   }
-}
-
-
-
-	let codeEditor = vscode.commands.registerCommand('test.logSelection', () => {
-        // Get the active text editor
-        const editor = vscode.window.activeTextEditor;
-
-        if (editor) {
-            const document = editor.document;
-            const selection = editor.selection;
-
-            // Get the text within the selection
-            const selectedText = document.getText(selection);
-
-            // Show the selected text in a message
-            vscode.window.showInformationMessage(`You selected: ${selectedText}`);
-        } else {
-            vscode.window.showInformationMessage('No editor is active.');
-        }
-    });
-
-    //handles adding a note 
-    let addNoteCommand = vscode.commands.registerCommand('test.addNote', async () => {
-        const note = await getNoteFromUser();
-        if(note){
-            console.log(`Note added: ${note}`);
-        }
-    });
-
-    //Register all commands 
-    context.subscriptions.push(codeEditor);
-	context.subscriptions.push(disposable);
-    context.subscriptions.push(addNoteCommand);
-
-	// Create the decoration type
-    todoDecorationType = vscode.window.createTextEditorDecorationType({
-        backgroundColor: 'rgba(255, 255, 0, 0.3)',
-        borderColor: 'rgba(255, 255, 0, 0.5)',
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        cursor: 'crosshair',
-        // Use a light theme color for the ruler
-        light: {
-            overviewRulerColor: 'yellow'
-        },
-        // Use a dark theme color for the ruler
-        dark: {
-            overviewRulerColor: 'darkorange'
-        }
-    });
-
-    let timeout; // A timeout variable for debouncing
-
-    // A function to find and apply decorations
-    function updateDecorations() {
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            return;
-        }
-
-        const text = editor.document.getText();
-        const todoMatches = [];
-        const regex = /TODO/g;
-        let match;
-        while ((match = regex.exec(text))) {
-            const startPos = editor.document.positionAt(match.index);
-            const endPos = editor.document.positionAt(match.index + match[0].length);
-            const range = new vscode.Range(startPos, endPos);
-            // Add the range to our array
-            todoMatches.push({ range, hoverMessage: 'This is a TODO item.' });
-        }
-
-        // Apply the decorations
-        editor.setDecorations(todoDecorationType, todoMatches);
-    }
-
-    // A function to trigger the update with a debounce
-    function triggerUpdateDecorations() {
-        if (timeout) {
-            clearTimeout(timeout);
-        }
-        timeout = setTimeout(updateDecorations, 500); // 500ms debounce
-    }
-
-    // Trigger the initial update
-    if (vscode.window.activeTextEditor) {
-        triggerUpdateDecorations();
-    }
-
-    // Add event listeners
-    vscode.window.onDidChangeActiveTextEditor(editor => {
-        if (editor) {
-            triggerUpdateDecorations();
-        }
-    }, null, context.subscriptions);
-
-    vscode.workspace.onDidChangeTextDocument(event => {
-        if (vscode.window.activeTextEditor && event.document === vscode.window.activeTextEditor.document) {
-            triggerUpdateDecorations();
-        }
-    }, null, context.subscriptions);
-
 }
 
 // This method is called when your extension is deactivated

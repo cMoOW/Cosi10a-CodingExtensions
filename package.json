@@ -3,7 +3,7 @@
   "displayName": "Python Linter",
   "description": "A work in progress version of a python linter extension",
   "version": "0.0.1",
-  "publisher": "Apoorva",
+  "publisher": "Jacob, SiMing, Brian, Apoorva",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -23,11 +23,15 @@
       },
       {
         "command": "test.addNote",
-        "title": "Add Note"
+        "title": "Add Post-It Note"
       },
       {
         "command": "test.logSelection",
         "title": "Log selected text"
+      },
+      {
+        "command": "test.viewNotes",
+        "title": " View Post-It Notes"
       },
       {
         "command": "test.emailCodeSnippet",
