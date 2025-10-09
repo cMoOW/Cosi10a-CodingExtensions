@@ -11,7 +11,7 @@ class NoteManager {
      */
     async addNote() {
         const note = await vscode.window.showInputBox({
-            prompt: '📝 Enter your Post-It note',
+            prompt: ' Enter your Post-It note',
             placeHolder: 'Type your note here...',
             ignoreFocusOut: true,
             validateInput: (text) => {
@@ -30,7 +30,7 @@ class NoteManager {
             this.notes.push(newNote);
             await this.saveNotes();
             
-            vscode.window.showInformationMessage(`📌 Note added: "${note.substring(0, 30)}${note.length > 30 ? '...' : ''}"`);
+            vscode.window.showInformationMessage(` Note added: "${note.substring(0, 30)}${note.length > 30 ? '...' : ''}"`);
             return newNote;
         }
 
@@ -42,12 +42,12 @@ class NoteManager {
      */
     async selectNoteColor() {
         const colors = [
-            { label: '💛 Yellow (Classic)', value: '#fff740' },
-            { label: '💗 Pink', value: '#ff6b9d' },
-            { label: '💙 Blue', value: '#00d4ff' },
-            { label: '💚 Green', value: '#7bed9f' },
-            { label: '🧡 Orange', value: '#ffa502' },
-            { label: '💜 Purple', value: '#a29bfe' }
+            { label: ' Yellow (Classic)', value: '#fff740' },
+            { label: ' Pink', value: '#ff6b9d' },
+            { label: ' Blue', value: '#00d4ff' },
+            { label: ' Green', value: '#7bed9f' },
+            { label: ' Orange', value: '#ffa502' },
+            { label: ' Purple', value: '#a29bfe' }
         ];
 
         const selected = await vscode.window.showQuickPick(colors, {
@@ -63,13 +63,13 @@ class NoteManager {
      */
     async viewAllNotes() {
         if (this.notes.length === 0) {
-            vscode.window.showInformationMessage('📝 No Post-It notes yet! Add one to get started.');
+            vscode.window.showInformationMessage(' No Post-It notes yet! Add one to get started.');
             return;
         }
 
         const panel = vscode.window.createWebviewPanel(
             'postItNotes',
-            '📌 My Post-It Notes',
+            ' My Post-It Notes',
             vscode.ViewColumn.One,
             {
                 enableScripts: true
@@ -99,7 +99,7 @@ class NoteManager {
     async deleteNote(noteId) {
         this.notes = this.notes.filter(note => note.id !== noteId);
         await this.saveNotes();
-        vscode.window.showInformationMessage('🗑️ Note deleted');
+        vscode.window.showInformationMessage('Note deleted');
     }
 
     /**
@@ -220,7 +220,7 @@ class NoteManager {
         </head>
         <body>
             <div class="container">
-                <h1>📌 My Post-It Notes</h1>
+                <h1> My Post-It Notes</h1>
                 ${this.notes.length === 0 ? `
                     <div class="empty-state">
                         <div class="empty-state-icon">📝</div>
