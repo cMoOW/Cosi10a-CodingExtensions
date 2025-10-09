@@ -1,9 +1,9 @@
 {
   "name": "python-lint",
   "displayName": "Python Linter",
-  "description": "A work in progress version of the our python linter extension",
+  "description": "A work in progress version of a python linter extension",
   "version": "0.0.1",
-  "publisher": "Apoorva",
+  "publisher": "Jacob, SiMing, Brian, Apoorva",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -12,18 +12,40 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "*"
+    "test.emailCodeSnippet"
   ],
   "main": "./extension.js",
   "contributes": {
-    "commands": [{
-      "command": "test.helloWorld",
-      "title": "Hello World"
-    },
-  {
-    "command":"test.logSelection",
-    "title":"Log selected text"
-  }]
+    "commands": [
+      {
+        "command": "test.helloWorld",
+        "title": "Hello World"
+      },
+      {
+        "command": "test.addNote",
+        "title": "Add Post-It Note"
+      },
+      {
+        "command": "test.logSelection",
+        "title": "Log selected text"
+      },
+      {
+        "command": "test.viewNotes",
+        "title": " View Post-It Notes"
+      },
+      {
+        "command": "test.emailCodeSnippet",
+        "title": "Email Code Snippet"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "test.emailCodeSnippet",
+          "when": "editorHasSelection"
+        }
+      ]
+    }
   },
   "scripts": {
     "lint": "eslint .",
@@ -31,11 +53,15 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.104.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "eslint": "^9.34.0",
+    "@types/vscode": "^1.104.0",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.34.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "nodemailer": "^7.0.6"
   }
 }
