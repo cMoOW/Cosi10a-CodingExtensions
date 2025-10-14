@@ -1,9 +1,9 @@
 {
   "name": "python-lint",
   "displayName": "Python Linter",
-  "description": "A work in progress version of the our python linter extension",
+  "description": "A work in progress version of a python linter extension",
   "version": "0.0.1",
-  "publisher": "Apoorva",
+  "publisher": "Jacob, SiMing, Brian, Apoorva",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -22,15 +22,23 @@
         "title": "Hello World"
       },
       {
+        "command": "test.addNote",
+        "title": "Add Post-It Note"
+      },
+      {
         "command": "test.logSelection",
         "title": "Log selected text"
+      },
+      {
+        "command": "test.viewNotes",
+        "title": " View Post-It Notes"
       },
       {
         "command": "test.emailCodeSnippet",
         "title": "Email Code Snippet"
       }
-    ]
-    ,"menus": {
+    ],
+    "menus": {
       "editor/context": [
         {
           "command": "test.emailCodeSnippet",

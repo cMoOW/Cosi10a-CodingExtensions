@@ -4,6 +4,10 @@ const vscode = require('vscode');
 // Import the highlighter functionality from the new file
 //const { activateHighlighter } = require('./src/highlight.js');
 const { sendHelloEmail } = require('./src/send-email.js');
+const { NoteManager } = require('./PostIt/noteManager');
+
+// This method is called when your extension is activated
+// Your extension is activated the very first time the command is executed
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -15,33 +19,58 @@ function activate(context) {
 	console.log('Congratulations, your extension "test" is now active!');
 	vscode.window.showInformationMessage('This extension is now active!');
 	
+	// Initialize Note Manager
+	const noteManager = new NoteManager(context);
+
+	// Create status bar item for notes
+	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+	statusBarItem.command = 'test.viewNotes';
+	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+	statusBarItem.tooltip = 'Click to view your Post-It notes';
+	statusBarItem.show();
+	context.subscriptions.push(statusBarItem);
+
 	const disposable = vscode.commands.registerCommand('test.helloWorld', function () {
 		// The code you place here will be executed every time your command is executed
 
 		// Display a message box to the user
 		vscode.window.showInformationMessage('Hello world has been run');
-    // Send the email when the command is executed
-   // sendEmailCommandHandler();
-    context.subscriptions.push(disposable);
+	});
+
+	// Add Note Command - using new NoteManager
+	let addNoteCommand = vscode.commands.registerCommand('test.addNote', async () => {
+		await noteManager.addNote();
+		// Update status bar count
+		statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+	});
+
+	// View Notes Command - NEW!
+	let viewNotesCommand = vscode.commands.registerCommand('test.viewNotes', async () => {
+		await noteManager.viewAllNotes();
 	});
  
-  const emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
-    // Get the active text editor
-    
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-        const selection = editor.selection;
-        const selectedText = editor.document.getText(selection);
-        console.log('Selected text:', selectedText);
-        vscode.window.showInformationMessage(`Selected text logged to console: ${selectedText}`);
-        
-        sendEmailCommandHandler(selectedText, editor.document.getText());
-    }
-    
-    context.subscriptions.push(emailCodeDisposable);
-  });
-  // highlight TODO: Uncomment this line to enable the highlighter functionality
-    //activateHighlighter(context);
+	const emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
+		// Get the active text editor
+		
+		const editor = vscode.window.activeTextEditor;
+		if (editor) {
+			const selection = editor.selection;
+			const selectedText = editor.document.getText(selection);
+			console.log('Selected text:', selectedText);
+			vscode.window.showInformationMessage(`Selected text logged to console: ${selectedText}`);
+			
+			sendEmailCommandHandler(selectedText, editor.document.getText());
+		}
+	});
+
+	// Register all commands
+	context.subscriptions.push(disposable);
+	context.subscriptions.push(addNoteCommand);
+	context.subscriptions.push(viewNotesCommand);
+	context.subscriptions.push(emailCodeDisposable);
+
+	// highlight TODO: Uncomment this line to enable the highlighter functionality
+	//activateHighlighter(context);
 }
 
 /**
@@ -84,7 +113,6 @@ async function sendEmailCommandHandler(highlightedText, documentText) {
     vscode.window.showErrorMessage('Failed to send email: ' + error.message);
   }
 }
-
 
 // This method is called when your extension is deactivated
 function deactivate() {}
