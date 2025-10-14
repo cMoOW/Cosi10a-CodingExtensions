@@ -79,16 +79,27 @@ function activate(context) {
  */
 async function sendEmailCommandHandler(highlightedText, documentText) {
   try {
-     // 1. Prompt for the email body
-    const email = await vscode.window.showInputBox({
-      prompt: "Enter your email",
-      placeHolder: "Type your email here..."
+     // 1. Prompt for the email body, need validation!!
+    let email = await vscode.window.showInputBox({
+      prompt: "Enter your Brandeis email",
+      placeHolder: "Type your Brandeis email here..."
     });
-    if (!email) return vscode.window.showInformationMessage('Email sending cancelled.');
+    while (!email || !email.includes('@brandeis.edu')) {
+      vscode.window.showInformationMessage('Please enter a valid Brandeis email address.');
+      email = await vscode.window.showInputBox({
+        prompt: "Enter your Brandeis email",
+        placeHolder: "Type your Brandeis email here..."
+      });
+    }
+
+    // redundant now with validation loop above
+    //if (!email) return vscode.window.showInformationMessage('Email sending cancelled.');
+   
     const message = await vscode.window.showInputBox({
       prompt: "Enter your message",
       placeHolder: "Type your message here..."
     });
+
     if (!message) return vscode.window.showInformationMessage('Email sending cancelled.');
     // Call the email service with all the user's input
     const messageId = await sendHelloEmail(highlightedText, documentText, email, message);
