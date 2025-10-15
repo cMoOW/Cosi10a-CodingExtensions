@@ -1,6 +1,12 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
+const { exec } = require('child_process');
+const path = require('path');
+
+const snakeCaseDecorationType = vscode.window.createTextEditorDecorationType({
+    textDecoration: 'underline wavy blue',
+});
 
 // Create a decoration type - this is like defining a CSS class
 let todoDecorationType = vscode.window.createTextEditorDecorationType({
@@ -20,7 +26,7 @@ let todoDecorationType = vscode.window.createTextEditorDecorationType({
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-
+    
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "test" is now active!');
@@ -34,7 +40,7 @@ function activate(context) {
 		// Display a message box to the user
 		vscode.window.showInformationMessage('This is proof of our work so far');
 	});
-
+    
 	let codeEditor = vscode.commands.registerCommand('test.logSelection', () => {
         // Get the active text editor
         const editor = vscode.window.activeTextEditor;
@@ -42,6 +48,7 @@ function activate(context) {
         if (editor) {
             const document = editor.document;
             const selection = editor.selection;
+            
 
             // Get the text within the selection
             const selectedText = document.getText(selection);
@@ -78,24 +85,43 @@ function activate(context) {
     // A function to find and apply decorations
     function updateDecorations() {
         const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            return;
+        const rcFilePath = path.join(context.extensionUri.fsPath, '.pylintrc');
+        const pluginPath = path.join(context.extensionUri.fsPath);
+        const env = { ...process.env, PYTHONPATH: pluginPath };
+        if (!editor) return; // Return if not editor
+        const document = editor.document;
+        if (document.languageId !== 'python') return; // Return if not in python
+        // Get the filePath and run pylint command on
+        const filePath = document.uri.fsPath;
+        let cwd = undefined;
+        if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+            cwd = vscode.workspace.workspaceFolders[0].uri.fsPath;
         }
+        const command = `python -m pylint --rcfile="${rcFilePath}" --load-plugins=linters.snake_case_checker "${filePath}"`;
+        exec(command, { cwd, env }, (error, stdout, stderr) => {
+            const decorations = [];
+            const regex_snake_case = /(.*):(\d+):\d+: C9000: Variable name '([^']+)' should be in snake_case\./g;
+            let match;
+            while ((match = regex_snake_case.exec(stdout))) {
+                vscode.window.showInformationMessage(stdout);
+                const lineNum = parseInt(match[2]) - 1;
+                const varName = match[3];
 
-        const text = editor.document.getText();
-        const todoMatches = [];
-        const regex = /TODO/g;
-        let match;
-        while ((match = regex.exec(text))) {
-            const startPos = editor.document.positionAt(match.index);
-            const endPos = editor.document.positionAt(match.index + match[0].length);
-            const range = new vscode.Range(startPos, endPos);
-            // Add the range to our array
-            todoMatches.push({ range, hoverMessage: 'This is a TODO item.' });
-        }
+                const lineText = document.lineAt(lineNum).text;
+                const startIdx = lineText.indexOf(varName);
+                if (startIdx === -1) continue;
 
-        // Apply the decorations
-        editor.setDecorations(todoDecorationType, todoMatches);
+                const startPos = new vscode.Position(lineNum, startIdx);
+                const endPos = new vscode.Position(lineNum, startIdx + varName.length);
+                const range = new vscode.Range(startPos, endPos);
+
+                decorations.push({
+                    range,
+                    hoverMessage: `Variable name '${varName}' should be in snake_case.`,
+                });
+            }
+            editor.setDecorations(snakeCaseDecorationType, decorations);
+        });
     }
 
     // A function to trigger the update with a debounce
