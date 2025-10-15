@@ -5,5 +5,5 @@ good_variable = 123       # In snake_case
 another_123_good = 246    # In snake_case
 CONSTANT_VALUE = 456      # In SCREAMING_SNAKE_CASE
 
-def pOp (unDone) :
+def pOp () :
     return

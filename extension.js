@@ -100,26 +100,31 @@ function activate(context) {
         const command = `python -m pylint --rcfile="${rcFilePath}" --load-plugins=linters.snake_case_checker "${filePath}"`;
         exec(command, { cwd, env }, (error, stdout, stderr) => {
             const decorations = [];
-            const regex_snake_case = /(.*):(\d+):\d+: C9000: Variable name '([^']+)' should be in snake_case\./g;
+            
+            // Universal RE for snake_case
+            const combined_regex = /(.*):(\d+):\d+: (C9000|C9001): (Variable|Function) name '([^']+)' should be in snake_case\./g;
             let match;
-            while ((match = regex_snake_case.exec(stdout))) {
-                vscode.window.showInformationMessage(stdout);
+
+            while ((match = combined_regex.exec(stdout))) {
+                // vscode.window.showInformationMessage(stdout); // call for debugging
                 const lineNum = parseInt(match[2]) - 1;
-                const varName = match[3];
+                const codeType = match[4]; // "Variable" or "Function"
+                const name = match[5];
 
                 const lineText = document.lineAt(lineNum).text;
-                const startIdx = lineText.indexOf(varName);
+                const startIdx = lineText.indexOf(name);
                 if (startIdx === -1) continue;
 
                 const startPos = new vscode.Position(lineNum, startIdx);
-                const endPos = new vscode.Position(lineNum, startIdx + varName.length);
+                const endPos = new vscode.Position(lineNum, startIdx + name.length);
                 const range = new vscode.Range(startPos, endPos);
 
                 decorations.push({
                     range,
-                    hoverMessage: `Variable name '${varName}' should be in snake_case.`,
+                    hoverMessage: `${codeType} name '${name}' should be in snake_case.`,
                 });
             }
+
             editor.setDecorations(snakeCaseDecorationType, decorations);
         });
     }

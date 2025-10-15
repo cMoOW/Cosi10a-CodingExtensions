@@ -1,4 +1,4 @@
 [MASTER]
 load-plugins=linters.snake_case_checker
 disable=all
-enable=invalid-variable-name-snake-case
+enable=invalid-variable-name-snake-case, invalid-function-name-snake-case
