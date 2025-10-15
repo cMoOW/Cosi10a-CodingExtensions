@@ -69,20 +69,32 @@ class NoteManager {
 
         const panel = vscode.window.createWebviewPanel(
             'postItNotes',
-            ' My Post-It Notes',
+            'My Post-It Notes',
             vscode.ViewColumn.One,
             {
                 enableScripts: true
             }
         );
 
+        //handles deleting a note 
         panel.webview.onDidReceiveMessage(async (message) => {
             if (message.type === 'deleteNote') {
                 const noteId = parseInt(message.id);
+                const deletedNote = this.notes.find(n => n.id === noteId);
                 this.notes = this.notes.filter(n => n.id !== noteId);
                 await this.saveNotes();
-                vscode.window.showInformationMessage('Note deleted.');
-                panel.webview.html = this.getWebviewContent(); // Refresh the view
+    
+                // Offer Undo option
+                vscode.window.showInformationMessage('Note deleted.', 'Undo').then(async (selection) => {
+                    if (selection === 'Undo' && deletedNote) {
+                        this.notes.push(deletedNote);
+                        await this.saveNotes();
+                        vscode.window.showInformationMessage('Note restored.');
+                        panel.webview.html = this.getWebviewContent(); // Refresh view
+                    }
+                });
+    
+                panel.webview.html = this.getWebviewContent(); // Refresh view
             }
         });
 
