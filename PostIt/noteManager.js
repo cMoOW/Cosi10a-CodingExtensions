@@ -96,6 +96,27 @@ class NoteManager {
     
                 panel.webview.html = this.getWebviewContent(); // Refresh view
             }
+
+            if (message.type === 'deleteAll') {
+                if (this.notes.length === 0) {
+                    vscode.window.showInformationMessage('There are no notes to delete.');
+                    return;
+                }
+        
+                const deletedNotesBackup = [...this.notes]; // backup for undo
+                this.notes = [];
+                await this.saveNotes();
+                panel.webview.html = this.getWebviewContent();
+        
+                vscode.window.showInformationMessage('🧹 All notes deleted.', 'Undo').then(async (selection) => {
+                    if (selection === 'Undo') {
+                        this.notes = deletedNotesBackup;
+                        await this.saveNotes();
+                        vscode.window.showInformationMessage('All notes restored.');
+                        panel.webview.html = this.getWebviewContent();
+                    }
+                });
+            }
         });
 
         panel.webview.html = this.getWebviewContent();
@@ -222,6 +243,21 @@ class NoteManager {
         </head>
         <body>
             <div class="container">
+            <h1 style="display: flex; justify-content: space-between; align-items: center; color: white;">
+                <span>My Post-It Notes</span>
+                ${this.notes.length > 0 ? `
+                    <button id="deleteAll" style="
+                        background: rgba(255, 50, 50, 0.85);
+                        border: none;
+                        color: white;
+                        padding: 8px 14px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        transition: background 0.2s ease;
+                    ">Delete All</button>
+                ` : ''}
+            </h1>
                 <h1> My Post-It Notes</h1>
                 ${this.notes.length === 0 ? `
                     <div class="empty-state">
@@ -244,6 +280,13 @@ class NoteManager {
                         vscode.postMessage({ type: 'deleteNote', id: noteId });
                     });
                 });
+
+                const deleteAllBtn = document.getElementById('deleteAll');
+                    if (deleteAllBtn) {
+                        deleteAllBtn.addEventListener('click', () => {
+                            vscode.postMessage({ type: 'deleteAll' });
+                        });
+                    }
             </script>
         </body>
         </html>`;
