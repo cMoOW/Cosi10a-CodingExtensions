@@ -76,6 +76,7 @@ class NoteManager {
             }
         );
 
+        //TODO: modularize this method 
         //handles deleting a note 
         panel.webview.onDidReceiveMessage(async (message) => {
             if (message.type === 'deleteNote') {
@@ -97,6 +98,7 @@ class NoteManager {
                 panel.webview.html = this.getWebviewContent(); // Refresh view
             }
 
+            //handles deleting all notes
             if (message.type === 'deleteAll') {
                 if (this.notes.length === 0) {
                     vscode.window.showInformationMessage('There are no notes to delete.');
@@ -117,6 +119,32 @@ class NoteManager {
                     }
                 });
             }
+
+            //handles editing a note
+            if (message.type === 'editNote') {
+                const noteId = parseInt(message.id);
+                const note = this.notes.find(n => n.id === noteId);
+                if (!note) return;
+            
+                const newContent = await vscode.window.showInputBox({
+                    prompt: 'Edit your note',
+                    value: note.content,
+                    ignoreFocusOut: true,
+                    validateInput: (text) => {
+                        return text.trim().length === 0 ? 'Note cannot be empty' : null;
+                    }
+                });
+            
+                if (newContent && newContent.trim()) {
+                    note.content = newContent.trim();
+                    note.timestamp = new Date().toISOString();
+                    await this.saveNotes();
+            
+                    vscode.window.showInformationMessage('Note updated successfully.');
+                    panel.webview.html = this.getWebviewContent(); // Refresh the view
+                }
+            }
+            
         });
 
         panel.webview.html = this.getWebviewContent();
@@ -143,6 +171,7 @@ class NoteManager {
                     <button class="delete-btn" title="Delete Note">×</button>
                 </div>
                 <div class="postit-content">${this.escapeHtml(note.content)}</div>
+                <button class="edit-btn" title="Edit Note">Edit</button>
             </div>
         `).join('');
 
@@ -223,6 +252,22 @@ class NoteManager {
                 .delete-btn:hover {
                     background: rgba(255, 0, 0, 0.9);
                 }
+                .edit-btn {
+                position: absolute;
+                bottom:8px;
+                right:8px;
+                background: rgba(0, 0, 0, 0.2);
+                border: none;
+                color: white;
+                font-size: 14px;
+                border-radius: 4px;
+                padding: 4px 6px;
+                cursor: pointer;
+                transition: background 0.2s ease;
+                }
+                .edit-btn:hover {
+                    background: rgba(0, 0, 0, 0.4);
+                }
                 .postit-content {
                     color: #333;
                     font-size: 14px;
@@ -287,6 +332,13 @@ class NoteManager {
                             vscode.postMessage({ type: 'deleteAll' });
                         });
                     }
+                document.querySelectorAll('.edit-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const noteEl = e.target.closest('.postit');
+                        const noteId = noteEl.getAttribute('data-id');
+                        vscode.postMessage({ type: 'editNote', id: noteId });
+                    });
+                });
             </script>
         </body>
         </html>`;
