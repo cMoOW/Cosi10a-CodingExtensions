@@ -76,31 +76,21 @@ class NoteManager {
             }
         );
 
+        panel.webview.onDidReceiveMessage(async (message) => {
+            if (message.type === 'deleteNote') {
+                const noteId = parseInt(message.id);
+                this.notes = this.notes.filter(n => n.id !== noteId);
+                await this.saveNotes();
+                vscode.window.showInformationMessage('Note deleted.');
+                panel.webview.html = this.getWebviewContent(); // Refresh the view
+            }
+        });
+
         panel.webview.html = this.getWebviewContent();
 
-        // Handle messages from webview
-        panel.webview.onDidReceiveMessage(
-            async message => {
-                switch (message.command) {
-                    case 'deleteNote':
-                        await this.deleteNote(message.noteId);
-                        panel.webview.html = this.getWebviewContent();
-                        break;
-                }
-            },
-            undefined,
-            this.context.subscriptions
-        );
+        
     }
 
-    /**
-     * Delete a note
-     */
-    async deleteNote(noteId) {
-        this.notes = this.notes.filter(note => note.id !== noteId);
-        await this.saveNotes();
-        vscode.window.showInformationMessage('Note deleted');
-    }
 
     /**
      * Save notes to global state
@@ -114,10 +104,10 @@ class NoteManager {
      */
     getWebviewContent() {
         const notesHtml = this.notes.map(note => `
-            <div class="postit" style="background-color: ${note.color}">
+            <div class="postit" style="background-color: ${note.color}" data-id="${note.id}">
                 <div class="postit-header">
                     <span class="postit-date">${new Date(note.timestamp).toLocaleDateString()}</span>
-                    <button class="delete-btn" onclick="deleteNote(${note.id})">✕</button>
+                    <button class="delete-btn" title="Delete Note">×</button>
                 </div>
                 <div class="postit-content">${this.escapeHtml(note.content)}</div>
             </div>
@@ -198,7 +188,7 @@ class NoteManager {
                     transition: background 0.2s ease;
                 }
                 .delete-btn:hover {
-                    background: rgba(255,0,0,0.9);
+                    background: rgba(255, 0, 0, 0.9);
                 }
                 .postit-content {
                     color: #333;
@@ -235,15 +225,13 @@ class NoteManager {
             </div>
             <script>
                 const vscode = acquireVsCodeApi();
-                
-                function deleteNote(noteId) {
-                    if (confirm('Delete this note?')) {
-                        vscode.postMessage({
-                            command: 'deleteNote',
-                            noteId: noteId
-                        });
-                    }
-                }
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const noteEl = e.target.closest('.postit');
+                        const noteId = noteEl.getAttribute('data-id');
+                        vscode.postMessage({ type: 'deleteNote', id: noteId });
+                    });
+                });
             </script>
         </body>
         </html>`;
