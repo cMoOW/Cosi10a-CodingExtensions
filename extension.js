@@ -38,16 +38,57 @@ function activate(context) {
 	});
 
 	// Add Note Command - using new NoteManager
-	let addNoteCommand = vscode.commands.registerCommand('test.addNote', async () => {
-		await noteManager.addNote();
-		// Update status bar count
-		statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
-	});
+	// let addNoteCommand = vscode.commands.registerCommand('test.addNote', async () => {
+	// 	await noteManager.addNote();
+	// 	// Update status bar count
+	// 	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+	// });
 
 	// View Notes Command - NEW!
 	let viewNotesCommand = vscode.commands.registerCommand('test.viewNotes', async () => {
 		await noteManager.viewAllNotes();
 	});
+
+	async function sendEmailCommandHandler(highlightedText, documentText) {
+		try {
+		   // 1. Prompt for the email body, need validation!!
+		  let email = await vscode.window.showInputBox({
+			prompt: "Enter your Brandeis email",
+			placeHolder: "Type your Brandeis email here..."
+		  });
+		  while (!email || !email.includes('@brandeis.edu')) {
+			vscode.window.showInformationMessage('Please enter a valid Brandeis email address.');
+			email = await vscode.window.showInputBox({
+			  prompt: "Enter your Brandeis email",
+			  placeHolder: "Type your Brandeis email here..."
+			});
+		  }
+	  
+		  // redundant now with validation loop above
+		  //if (!email) return vscode.window.showInformationMessage('Email sending cancelled.');
+		 
+		  const message = await vscode.window.showInputBox({
+			prompt: "Enter your message",
+			placeHolder: "Type your message here..."
+		  });
+	  
+		  if (!message) return vscode.window.showInformationMessage('Email sending cancelled.');
+		  // Call the email service with all the user's input
+		  const messageId = await sendHelloEmail(highlightedText, documentText, email, message);
+	  
+		  console.log('Email sent successfully. Message ID:', messageId);
+		  // vscode.window.showInformationMessage(`Email successfully sent! Message ID: ${messageId}`);
+		  vscode.window.showInformationMessage('Email successfully sent!');
+	  
+	  
+		  await noteManager.addNote(message);
+			statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+	  
+		} catch (error) {
+		  console.error('Error sending email:', error);
+		  vscode.window.showErrorMessage('Failed to send email: ' + error.message);
+		}
+	  }
  
 	const emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
 		// Get the active text editor
@@ -65,54 +106,19 @@ function activate(context) {
 
 	// Register all commands
 	context.subscriptions.push(disposable);
-	context.subscriptions.push(addNoteCommand);
+	// context.subscriptions.push(addNoteCommand);
 	context.subscriptions.push(viewNotesCommand);
 	context.subscriptions.push(emailCodeDisposable);
 
 	// highlight TODO: Uncomment this line to enable the highlighter functionality
-	//activateHighlighter(context);
+	// activateHighlighter(context);
 }
 
 /**
  * Handles the logic for the "helloWorld" command.
  * It prompts the user for email details and calls the email service.
  */
-async function sendEmailCommandHandler(highlightedText, documentText) {
-  try {
-     // 1. Prompt for the email body, need validation!!
-    let email = await vscode.window.showInputBox({
-      prompt: "Enter your Brandeis email",
-      placeHolder: "Type your Brandeis email here..."
-    });
-    while (!email || !email.includes('@brandeis.edu')) {
-      vscode.window.showInformationMessage('Please enter a valid Brandeis email address.');
-      email = await vscode.window.showInputBox({
-        prompt: "Enter your Brandeis email",
-        placeHolder: "Type your Brandeis email here..."
-      });
-    }
 
-    // redundant now with validation loop above
-    //if (!email) return vscode.window.showInformationMessage('Email sending cancelled.');
-   
-    const message = await vscode.window.showInputBox({
-      prompt: "Enter your message",
-      placeHolder: "Type your message here..."
-    });
-
-    if (!message) return vscode.window.showInformationMessage('Email sending cancelled.');
-    // Call the email service with all the user's input
-    const messageId = await sendHelloEmail(highlightedText, documentText, email, message);
-
-    console.log('Email sent successfully. Message ID:', messageId);
-    // vscode.window.showInformationMessage(`Email successfully sent! Message ID: ${messageId}`);
-    vscode.window.showInformationMessage('Email successfully sent!');
-
-  } catch (error) {
-    console.error('Error sending email:', error);
-    vscode.window.showErrorMessage('Failed to send email: ' + error.message);
-  }
-}
 
 // This method is called when your extension is deactivated
 function deactivate() {}

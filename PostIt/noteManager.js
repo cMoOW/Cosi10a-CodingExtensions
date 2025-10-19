@@ -9,20 +9,20 @@ class NoteManager {
     /**
      * Add a new note
      */
-    async addNote() {
-        const note = await vscode.window.showInputBox({
-            prompt: ' Enter your Post-It note',
-            placeHolder: 'Type your note here...',
-            ignoreFocusOut: true,
-            validateInput: (text) => {
-                return text.trim().length === 0 ? 'Note cannot be empty' : null;
-            }
-        });
+    async addNote(message) {
+        // const note = await vscode.window.showInputBox({
+        //     prompt: ' Enter your Post-It note',
+        //     placeHolder: 'Type your note here...',
+        //     ignoreFocusOut: true,
+        //     validateInput: (text) => {
+        //         return text.trim().length === 0 ? 'Note cannot be empty' : null;
+        //     }
+        // });
 
-        if (note && note.trim()) {
+        if (message && message.trim()) {
             const newNote = {
                 id: Date.now(),
-                content: note.trim(),
+                content: message.trim(),
                 timestamp: new Date().toISOString(),
                 color: await this.selectNoteColor()
             };
@@ -30,7 +30,7 @@ class NoteManager {
             this.notes.push(newNote);
             await this.saveNotes();
             
-            vscode.window.showInformationMessage(` Note added: "${note.substring(0, 30)}${note.length > 30 ? '...' : ''}"`);
+            vscode.window.showInformationMessage(` Note added: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`);
             return newNote;
         }
 
