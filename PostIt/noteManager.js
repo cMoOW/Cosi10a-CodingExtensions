@@ -10,14 +10,6 @@ class NoteManager {
      * Add a new note
      */
     async addNote(message) {
-        // const note = await vscode.window.showInputBox({
-        //     prompt: ' Enter your Post-It note',
-        //     placeHolder: 'Type your note here...',
-        //     ignoreFocusOut: true,
-        //     validateInput: (text) => {
-        //         return text.trim().length === 0 ? 'Note cannot be empty' : null;
-        //     }
-        // });
 
         if (message && message.trim()) {
             const newNote = {
@@ -31,6 +23,10 @@ class NoteManager {
             await this.saveNotes();
             
             vscode.window.showInformationMessage(` Note added: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`);
+
+            await this.viewAllNotes();
+
+
             return newNote;
         }
 
@@ -42,20 +38,15 @@ class NoteManager {
      */
     async selectNoteColor() {
         const colors = [
-            { label: ' Yellow (Classic)', value: '#fff740' },
-            { label: ' Pink', value: '#ff6b9d' },
-            { label: ' Blue', value: '#00d4ff' },
-            { label: ' Green', value: '#7bed9f' },
-            { label: ' Orange', value: '#ffa502' },
-            { label: ' Purple', value: '#a29bfe' }
+            '#355E3B', // Dark Green
+            '#699987', // Mint Green
+            '#8d698d'  // Soft Lavender
         ];
+    
+        // Pick a random color each time
+        const randomIndex = Math.floor(Math.random() * colors.length);
+        return colors[randomIndex];
 
-        const selected = await vscode.window.showQuickPick(colors, {
-            placeHolder: 'Choose a Post-It note color',
-            ignoreFocusOut: true
-        });
-
-        return selected ? selected.value : '#fff740'; // Default to yellow
     }
 
     /**
@@ -185,7 +176,7 @@ class NoteManager {
                 body {
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     padding: 20px;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: #1f1f1f;
                     min-height: 100vh;
                 }
                 .container {
@@ -234,7 +225,7 @@ class NoteManager {
                 }
                 .postit-date {
                     font-size: 11px;
-                    color: rgba(0,0,0,0.5);
+                    color: #ffffff;
                     font-weight: 600;
                 }
                 .delete-btn {
@@ -269,7 +260,7 @@ class NoteManager {
                     background: rgba(0, 0, 0, 0.4);
                 }
                 .postit-content {
-                    color: #333;
+                    color: #ffffff;
                     font-size: 14px;
                     line-height: 1.6;
                     word-wrap: break-word;

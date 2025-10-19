@@ -22,10 +22,6 @@
         "title": "Hello World"
       },
       {
-        "command": "test.addNote",
-        "title": "Add Post-It Note"
-      },
-      {
         "command": "test.logSelection",
         "title": "Log selected text"
       },

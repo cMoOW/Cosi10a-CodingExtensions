@@ -37,82 +37,213 @@ function activate(context) {
 		vscode.window.showInformationMessage('Hello world has been run');
 	});
 
-	// Add Note Command - using new NoteManager
-	// let addNoteCommand = vscode.commands.registerCommand('test.addNote', async () => {
-	// 	await noteManager.addNote();
-	// 	// Update status bar count
-	// 	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
-	// });
-
 	// View Notes Command - NEW!
 	let viewNotesCommand = vscode.commands.registerCommand('test.viewNotes', async () => {
 		await noteManager.viewAllNotes();
 	});
 
-	async function sendEmailCommandHandler(highlightedText, documentText) {
-		try {
-		   // 1. Prompt for the email body, need validation!!
-		  let email = await vscode.window.showInputBox({
-			prompt: "Enter your Brandeis email",
-			placeHolder: "Type your Brandeis email here..."
-		  });
-		  while (!email || !email.includes('@brandeis.edu')) {
-			vscode.window.showInformationMessage('Please enter a valid Brandeis email address.');
-			email = await vscode.window.showInputBox({
-			  prompt: "Enter your Brandeis email",
-			  placeHolder: "Type your Brandeis email here..."
-			});
-		  }
-	  
-		  // redundant now with validation loop above
-		  //if (!email) return vscode.window.showInformationMessage('Email sending cancelled.');
-		 
-		  const message = await vscode.window.showInputBox({
-			prompt: "Enter your message",
-			placeHolder: "Type your message here..."
-		  });
-	  
-		  if (!message) return vscode.window.showInformationMessage('Email sending cancelled.');
-		  // Call the email service with all the user's input
-		  const messageId = await sendHelloEmail(highlightedText, documentText, email, message);
-	  
-		  console.log('Email sent successfully. Message ID:', messageId);
-		  // vscode.window.showInformationMessage(`Email successfully sent! Message ID: ${messageId}`);
-		  vscode.window.showInformationMessage('Email successfully sent!');
-	  
-	  
-		  await noteManager.addNote(message);
-			statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
-	  
-		} catch (error) {
-		  console.error('Error sending email:', error);
-		  vscode.window.showErrorMessage('Failed to send email: ' + error.message);
-		}
-	  }
- 
-	const emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
-		// Get the active text editor
+	async function sendEmailCommandHandler(highlightedText, documentText, noteManager, statusBarItem) {
+		const panel = vscode.window.createWebviewPanel(
+			'emailPopup',
+			'Send Code Snippet via Email',
+			vscode.ViewColumn.Active,
+			{
+				enableScripts: true,
+				retainContextWhenHidden: false
+			}
+		);
+	
+		panel.webview.html = getEmailFormHTML();
+	
+		// Listen for messages from the webview
+		panel.webview.onDidReceiveMessage(async (message) => {
+			if (message.type === 'submitEmailForm') {
+				const { email, userMessage } = message.data;
+	
+				if (!email.endsWith('@brandeis.edu')) {
+					vscode.window.showErrorMessage('Please enter a valid Brandeis email.');
+					return;
+				}
+	
+				try {
+					const messageId = await sendHelloEmail(highlightedText, documentText, email, userMessage);
+					vscode.window.showInformationMessage('Email successfully sent!');
+					panel.dispose();
+	
+					// Optional: Add the message as a Post-It note
+					await noteManager.addNote(userMessage);
+					statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+
+				} catch (error) {
+					vscode.window.showErrorMessage('Failed to send email: ' + error.message);
+				}
+			}
+		});
 		
+		// try {
+		//    // 1. Prompt for the email body, need validation!!
+		//   let email = await vscode.window.showInputBox({
+		// 	prompt: "Enter your Brandeis email",
+		// 	placeHolder: "Type your Brandeis email here..."
+		//   });
+		//   while (!email || !email.includes('@brandeis.edu')) {
+		// 	vscode.window.showInformationMessage('Please enter a valid Brandeis email address.');
+		// 	email = await vscode.window.showInputBox({
+		// 	  prompt: "Enter your Brandeis email",
+		// 	  placeHolder: "Type your Brandeis email here..."
+		// 	});
+		//   }
+	  
+		//   // redundant now with validation loop above
+		//   //if (!email) return vscode.window.showInformationMessage('Email sending cancelled.');
+		 
+		//   const message = await vscode.window.showInputBox({
+		// 	prompt: "Enter your message",
+		// 	placeHolder: "Type your message here..."
+		//   });
+	  
+		//   if (!message) return vscode.window.showInformationMessage('Email sending cancelled.');
+		//   // Call the email service with all the user's input
+		//   const messageId = await sendHelloEmail(highlightedText, documentText, email, message);
+	  
+		//   console.log('Email sent successfully. Message ID:', messageId);
+		//   // vscode.window.showInformationMessage(`Email successfully sent! Message ID: ${messageId}`);
+		//   vscode.window.showInformationMessage('Email successfully sent!');
+	  
+	  
+		//   await noteManager.addNote(message);
+		// 	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+	  
+		// } catch (error) {
+		//   console.error('Error sending email:', error);
+		//   vscode.window.showErrorMessage('Failed to send email: ' + error.message);
+		// }
+	  }
+
+	  let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
 		const editor = vscode.window.activeTextEditor;
 		if (editor) {
 			const selection = editor.selection;
 			const selectedText = editor.document.getText(selection);
-			console.log('Selected text:', selectedText);
-			vscode.window.showInformationMessage(`Selected text logged to console: ${selectedText}`);
-			
-			sendEmailCommandHandler(selectedText, editor.document.getText());
+			sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager, statusBarItem);
 		}
 	});
+ 
+	// const emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
+	// 	// Get the active text editor
+		
+	// 	const editor = vscode.window.activeTextEditor;
+	// 	if (editor) {
+	// 		const selection = editor.selection;
+	// 		const selectedText = editor.document.getText(selection);
+	// 		console.log('Selected text:', selectedText);
+	// 		vscode.window.showInformationMessage(`Selected text logged to console: ${selectedText}`);
+			
+	// 		sendEmailCommandHandler(selectedText, editor.document.getText());
+	// 	}
+	// });
 
 	// Register all commands
 	context.subscriptions.push(disposable);
-	// context.subscriptions.push(addNoteCommand);
 	context.subscriptions.push(viewNotesCommand);
 	context.subscriptions.push(emailCodeDisposable);
 
 	// highlight TODO: Uncomment this line to enable the highlighter functionality
 	// activateHighlighter(context);
 }
+
+
+function getEmailFormHTML() {
+    return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Email Code Snippet</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, sans-serif;
+                padding: 20px;
+                background: #1e1e1e;
+                color: #fff;
+            }
+            h2 {
+                text-align: center;
+                color: #fff;
+                margin-bottom: 20px;
+            }
+            form {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                background: #2c2c2c;
+                border-radius: 8px;
+                padding: 20px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            }
+            label {
+                font-weight: 500;
+            }
+            input, textarea {
+                width: 100%;
+                padding: 10px;
+                border-radius: 4px;
+                border: none;
+                font-size: 14px;
+                background: #3a3a3a;
+                color: white;
+                outline: none;
+            }
+            input:focus, textarea:focus {
+                border: 1px solid #74B9FF;
+            }
+            button {
+                background: #74B9FF;
+                color: #1e1e1e;
+                padding: 10px 15px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: bold;
+                transition: 0.2s ease;
+            }
+            button:hover {
+                background: #5aa0e6;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Send Your Code Snippet</h2>
+        <form id="emailForm">
+            <div>
+                <label for="email">Brandeis Email:</label>
+                <input type="email" id="email" placeholder="you@brandeis.edu" required />
+            </div>
+            <div>
+                <label for="message">Message:</label>
+                <textarea id="message" rows="4" placeholder="Enter your message..." required></textarea>
+            </div>
+            <button type="submit">Send Email</button>
+        </form>
+
+        <script>
+            const vscode = acquireVsCodeApi();
+            document.getElementById('emailForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email').value.trim();
+                const userMessage = document.getElementById('message').value.trim();
+                vscode.postMessage({
+                    type: 'submitEmailForm',
+                    data: { email, userMessage }
+                });
+            });
+        </script>
+    </body>
+    </html>
+    `;
+}
+
 
 /**
  * Handles the logic for the "helloWorld" command.
