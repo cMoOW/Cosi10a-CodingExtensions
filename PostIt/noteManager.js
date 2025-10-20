@@ -1,9 +1,38 @@
 const vscode = require('vscode');
+const fs = require('fs');
+const path = require('path');
 
 class NoteManager {
-    constructor(context) {
+    constructor(context, onNotesChanged = null) {
         this.context = context;
-        this.notes = context.globalState.get('postItNotes', []);
+        this.notesFilePath = path.join(context.globalStorageUri.fsPath, 'postItNotes.json');
+        this.notes = this.loadNotes();
+        this.activePanel = null; // Track the active webview panel
+        this.onNotesChanged = onNotesChanged; // Callback for when notes change
+        console.log('NoteManager initialized with', this.notes.length, 'existing notes');
+    }
+
+    /**
+     * Load notes from file
+     */
+    loadNotes() {
+        try {
+            // Ensure directory exists
+            const dir = path.dirname(this.notesFilePath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            
+            if (fs.existsSync(this.notesFilePath)) {
+                const data = fs.readFileSync(this.notesFilePath, 'utf8');
+                const notes = JSON.parse(data);
+                console.log('Loaded', notes.length, 'notes from file');
+                return notes;
+            }
+        } catch (error) {
+            console.error('Error loading notes:', error);
+        }
+        return [];
     }
 
     /**
@@ -24,7 +53,10 @@ class NoteManager {
             
             vscode.window.showInformationMessage(` Note added: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`);
 
-            await this.viewAllNotes();
+            // Refresh the active panel if it exists
+            if (this.activePanel) {
+                this.activePanel.webview.html = this.getWebviewContent();
+            }
 
 
             return newNote;
@@ -58,6 +90,13 @@ class NoteManager {
             return;
         }
 
+        // If there's already an active panel, just refresh it
+        if (this.activePanel) {
+            this.activePanel.webview.html = this.getWebviewContent();
+            this.activePanel.reveal(vscode.ViewColumn.One);
+            return;
+        }
+
         const panel = vscode.window.createWebviewPanel(
             'postItNotes',
             'My Post-It Notes',
@@ -66,6 +105,14 @@ class NoteManager {
                 enableScripts: true
             }
         );
+
+        // Track this panel
+        this.activePanel = panel;
+
+        // Clear the reference when panel is disposed
+        panel.onDidDispose(() => {
+            this.activePanel = null;
+        });
 
         //TODO: modularize this method 
         //handles deleting a note 
@@ -111,29 +158,47 @@ class NoteManager {
                 });
             }
 
-            //handles editing a note
+            //handles editing a note (inline editing)
             if (message.type === 'editNote') {
                 const noteId = parseInt(message.id);
                 const note = this.notes.find(n => n.id === noteId);
                 if (!note) return;
             
-                const newContent = await vscode.window.showInputBox({
-                    prompt: 'Edit your note',
-                    value: note.content,
-                    ignoreFocusOut: true,
-                    validateInput: (text) => {
-                        return text.trim().length === 0 ? 'Note cannot be empty' : null;
-                    }
+                // Toggle edit mode in the webview
+                panel.webview.postMessage({ 
+                    type: 'toggleEditMode', 
+                    noteId: noteId,
+                    content: note.content 
                 });
-            
-                if (newContent && newContent.trim()) {
+            }
+
+            //handles saving edited note content
+            if (message.type === 'saveNoteEdit') {
+                const noteId = parseInt(message.noteId);
+                const newContent = message.content;
+                const note = this.notes.find(n => n.id === noteId);
+                
+                if (note && newContent && newContent.trim()) {
                     note.content = newContent.trim();
                     note.timestamp = new Date().toISOString();
                     await this.saveNotes();
-            
-                    vscode.window.showInformationMessage('Note updated successfully.');
-                    panel.webview.html = this.getWebviewContent(); // Refresh the view
+                    
+                    // Exit edit mode and refresh
+                    panel.webview.postMessage({ 
+                        type: 'exitEditMode', 
+                        noteId: noteId 
+                    });
+                    panel.webview.html = this.getWebviewContent();
                 }
+            }
+
+            //handles canceling edit
+            if (message.type === 'cancelEdit') {
+                const noteId = parseInt(message.noteId);
+                panel.webview.postMessage({ 
+                    type: 'exitEditMode', 
+                    noteId: noteId 
+                });
             }
             
         });
@@ -145,10 +210,37 @@ class NoteManager {
 
 
     /**
-     * Save notes to global state
+     * Save notes to file
      */
     async saveNotes() {
-        await this.context.globalState.update('postItNotes', this.notes);
+        try {
+            // Ensure directory exists
+            const dir = path.dirname(this.notesFilePath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            
+            // Save to file
+            fs.writeFileSync(this.notesFilePath, JSON.stringify(this.notes, null, 2));
+            console.log('Saved', this.notes.length, 'notes to file');
+            
+            // Also save to global state as backup
+            await this.context.globalState.update('postItNotes', this.notes);
+            
+            // Notify that notes have changed
+            this.notifyNotesChanged();
+        } catch (error) {
+            console.error('Error saving notes:', error);
+        }
+    }
+
+    /**
+     * Notify that notes have changed
+     */
+    notifyNotesChanged() {
+        if (this.onNotesChanged) {
+            this.onNotesChanged(this.notes.length);
+        }
     }
 
     /**
@@ -161,7 +253,14 @@ class NoteManager {
                     <span class="postit-date">${new Date(note.timestamp).toLocaleDateString()}</span>
                     <button class="delete-btn" title="Delete Note">×</button>
                 </div>
-                <div class="postit-content">${this.escapeHtml(note.content)}</div>
+                <div class="postit-content" id="content-${note.id}">${this.escapeHtml(note.content)}</div>
+                <div class="postit-edit" id="edit-${note.id}" style="display: none;">
+                    <textarea class="edit-textarea" id="textarea-${note.id}" placeholder="Edit your note...">${this.escapeHtml(note.content)}</textarea>
+                    <div class="edit-buttons">
+                        <button class="save-btn" data-id="${note.id}">Save</button>
+                        <button class="cancel-btn" data-id="${note.id}">Cancel</button>
+                    </div>
+                </div>
                 <button class="edit-btn" title="Edit Note">Edit</button>
             </div>
         `).join('');
@@ -266,6 +365,55 @@ class NoteManager {
                     word-wrap: break-word;
                     white-space: pre-wrap;
                 }
+                .postit-edit {
+                    margin-top: 10px;
+                }
+                .edit-textarea {
+                    width: 100%;
+                    min-height: 100px;
+                    padding: 10px;
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    border-radius: 4px;
+                    background: rgba(255, 255, 255, 0.1);
+                    color: white;
+                    font-family: 'Courier New', monospace;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    resize: vertical;
+                    outline: none;
+                }
+                .edit-textarea:focus {
+                    border-color: #74B9FF;
+                    background: rgba(255, 255, 255, 0.15);
+                }
+                .edit-buttons {
+                    display: flex;
+                    gap: 8px;
+                    margin-top: 8px;
+                }
+                .save-btn, .cancel-btn {
+                    padding: 6px 12px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 12px;
+                    font-weight: 600;
+                    transition: all 0.2s ease;
+                }
+                .save-btn {
+                    background: #28a745;
+                    color: white;
+                }
+                .save-btn:hover {
+                    background: #218838;
+                }
+                .cancel-btn {
+                    background: #6c757d;
+                    color: white;
+                }
+                .cancel-btn:hover {
+                    background: #5a6268;
+                }
                 .empty-state {
                     text-align: center;
                     color: white;
@@ -330,6 +478,61 @@ class NoteManager {
                         vscode.postMessage({ type: 'editNote', id: noteId });
                     });
                 });
+
+                // Handle save and cancel buttons for inline editing
+                document.querySelectorAll('.save-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const noteId = e.target.getAttribute('data-id');
+                        const textarea = document.getElementById('textarea-' + noteId);
+                        const content = textarea.value;
+                        vscode.postMessage({ 
+                            type: 'saveNoteEdit', 
+                            noteId: noteId, 
+                            content: content 
+                        });
+                    });
+                });
+
+                document.querySelectorAll('.cancel-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const noteId = e.target.getAttribute('data-id');
+                        vscode.postMessage({ 
+                            type: 'cancelEdit', 
+                            noteId: noteId 
+                        });
+                    });
+                });
+
+                // Listen for messages from the extension
+                window.addEventListener('message', event => {
+                    const message = event.data;
+                    
+                    if (message.type === 'toggleEditMode') {
+                        const noteId = message.noteId;
+                        const contentDiv = document.getElementById('content-' + noteId);
+                        const editDiv = document.getElementById('edit-' + noteId);
+                        const textarea = document.getElementById('textarea-' + noteId);
+                        
+                        // Hide content, show edit mode
+                        contentDiv.style.display = 'none';
+                        editDiv.style.display = 'block';
+                        
+                        // Set textarea content and focus
+                        textarea.value = message.content;
+                        textarea.focus();
+                        textarea.select();
+                    }
+                    
+                    if (message.type === 'exitEditMode') {
+                        const noteId = message.noteId;
+                        const contentDiv = document.getElementById('content-' + noteId);
+                        const editDiv = document.getElementById('edit-' + noteId);
+                        
+                        // Show content, hide edit mode
+                        contentDiv.style.display = 'block';
+                        editDiv.style.display = 'none';
+                    }
+                });
             </script>
         </body>
         </html>`;
@@ -353,6 +556,15 @@ class NoteManager {
      * Get notes count
      */
     getNotesCount() {
+        return this.notes.length;
+    }
+
+    /**
+     * Refresh notes from file (useful for debugging)
+     */
+    async refreshNotes() {
+        this.notes = this.loadNotes();
+        console.log('Notes refreshed. Total notes:', this.notes.length);
         return this.notes.length;
     }
 }

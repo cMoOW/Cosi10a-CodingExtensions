@@ -37,7 +37,11 @@ async function sendHelloEmail(highlightedText,body, email, message) {
   // 2. Define the email's content
   const mailOptions = {
     from: `"VS Code Extension" <${process.env.EMAIL_USER}>`,
-    to: process.env.EMAIL_SEND + ","+email, // The email address toclea send to
+    // Option 1: Only send to student-entered emails (current setting)
+    to: email,
+    // Option 2: Always include TAs + student choice (uncomment to enable)
+    // to: process.env.EMAIL_SEND + "," + email,
+    
     subject: 'Bug Report from VS Code Extension from '+ email,
     html: '<h3>There has been a bug request from a student. The code is below and the highlighted section is the area of interest.</h3><span>The student sent this message: '+ message +'</span><pre>' + highlightedHTML + '</pre>' + '<h3>End of Code</h3><h3>Please Respond to: ' + email + '</h3>',
   };

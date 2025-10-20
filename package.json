@@ -30,14 +30,26 @@
         "title": " View Post-It Notes"
       },
       {
+        "command": "test.addNote",
+        "title": " Add Post-It Note"
+      },
+      {
         "command": "test.emailCodeSnippet",
         "title": "Email Code Snippet"
+      },
+      {
+        "command": "test.addNoteFromSelection",
+        "title": "Add Selected Text as Note"
       }
     ],
     "menus": {
       "editor/context": [
         {
           "command": "test.emailCodeSnippet",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "test.addNoteFromSelection",
           "when": "editorHasSelection"
         }
       ]
