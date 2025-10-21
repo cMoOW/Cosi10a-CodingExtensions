@@ -55,18 +55,7 @@ function activate(context) {
 
 	// Add Note Command 
 	let addNoteCommand = vscode.commands.registerCommand('test.addNote', async () => {
-		const message = await vscode.window.showInputBox({
-			prompt: 'Enter your note content',
-			placeHolder: 'Type your note here...',
-			validateInput: (text) => {
-				return text.trim().length === 0 ? 'Note cannot be empty' : null;
-			}
-		});
-
-		if (message && message.trim()) {
-			await noteManager.addNote(message);
-			await updateStatusBar(); // Refresh and update status bar
-		}
+		await noteManager.showFloatingEditor();
 	});
 
 	// Add Note from Selection Command
@@ -77,13 +66,13 @@ function activate(context) {
 			const selectedText = editor.document.getText(selection);
 			
 			if (selectedText.trim()) {
-				await noteManager.addNote(selectedText);
-				await updateStatusBar(); // Refresh and update status bar
+				await noteManager.showInlineNoteEditor(selectedText);
 			} else {
 				vscode.window.showWarningMessage('Please select some text to add as a note.');
 			}
 		}
 	});
+
 
 	async function sendEmailCommandHandler(highlightedText, documentText, noteManager) {
 		const panel = vscode.window.createWebviewPanel(

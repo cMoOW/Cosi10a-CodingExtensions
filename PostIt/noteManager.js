@@ -12,6 +12,7 @@ class NoteManager {
         console.log('NoteManager initialized with', this.notes.length, 'existing notes');
     }
 
+
     /**
      * Load notes from file
      */
@@ -58,11 +59,112 @@ class NoteManager {
                 this.activePanel.webview.html = this.getWebviewContent();
             }
 
-
             return newNote;
         }
 
         return null;
+    }
+
+    /**
+     * Show floating note editor for adding new notes
+     */
+    async showFloatingEditor(initialContent = '') {
+        const panel = vscode.window.createWebviewPanel(
+            'floatingNoteEditor',
+            'Add New Post-It Note',
+            vscode.ViewColumn.Active,
+            {
+                enableScripts: true,
+                retainContextWhenHidden: false
+            }
+        );
+
+        panel.webview.html = this.getFloatingEditorHTML(initialContent);
+
+        // Handle messages from the floating editor
+        panel.webview.onDidReceiveMessage(async (message) => {
+            if (message.type === 'saveNote') {
+                const content = message.content.trim();
+                if (content) {
+                    const newNote = {
+                        id: Date.now(),
+                        content: content,
+                        timestamp: new Date().toISOString(),
+                        color: await this.selectNoteColor()
+                    };
+
+                    this.notes.push(newNote);
+                    await this.saveNotes();
+                    
+                    vscode.window.showInformationMessage(`Note added: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`);
+                    
+                    // Refresh the active panel if it exists
+                    if (this.activePanel) {
+                        this.activePanel.webview.html = this.getWebviewContent();
+                    }
+                    
+                    panel.dispose();
+                } else {
+                    vscode.window.showWarningMessage('Note cannot be empty');
+                }
+            }
+            
+            if (message.type === 'cancelNote') {
+                panel.dispose();
+            }
+        });
+    }
+
+
+
+    /**
+     * Show inline note editor that appears over the code editor
+     */
+    async showInlineNoteEditor(initialContent = '') {
+        const panel = vscode.window.createWebviewPanel(
+            'inlineNoteEditor',
+            'Quick Note',
+            vscode.ViewColumn.Beside, // Open beside the current editor
+            {
+                enableScripts: true,
+                retainContextWhenHidden: false
+            }
+        );
+
+        panel.webview.html = this.getInlineEditorHTML(initialContent);
+
+        // Handle messages from the inline editor
+        panel.webview.onDidReceiveMessage(async (message) => {
+            if (message.type === 'saveNote') {
+                const content = message.content.trim();
+                if (content) {
+                    const newNote = {
+                        id: Date.now(),
+                        content: content,
+                        timestamp: new Date().toISOString(),
+                        color: await this.selectNoteColor()
+                    };
+
+                    this.notes.push(newNote);
+                    await this.saveNotes();
+                    
+                    vscode.window.showInformationMessage(`Note added: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`);
+                    
+                    // Refresh the active panel if it exists
+                    if (this.activePanel) {
+                        this.activePanel.webview.html = this.getWebviewContent();
+                    }
+                    
+                    panel.dispose();
+                } else {
+                    vscode.window.showWarningMessage('Note cannot be empty');
+                }
+            }
+            
+            if (message.type === 'cancelNote') {
+                panel.dispose();
+            }
+        });
     }
 
     /**
@@ -242,6 +344,322 @@ class NoteManager {
             this.onNotesChanged(this.notes.length);
         }
     }
+
+    /**
+     * Get floating editor HTML content
+     */
+    getFloatingEditorHTML(initialContent = '') {
+        return `<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Add New Post-It Note</title>
+            <style>
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    padding: 20px;
+                    background: #1f1f1f;
+                    margin: 0;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .floating-editor {
+                    background: #2c2c2c;
+                    border-radius: 8px;
+                    padding: 20px;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                    max-width: 600px;
+                    width: 100%;
+                }
+                h2 {
+                    color: white;
+                    margin: 0 0 15px 0;
+                    text-align: center;
+                }
+                .editor-textarea {
+                    width: 100%;
+                    min-height: 200px;
+                    padding: 15px;
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    border-radius: 6px;
+                    background: rgba(255, 255, 255, 0.1);
+                    color: white;
+                    font-family: 'Courier New', monospace;
+                    font-size: 14px;
+                    line-height: 1.5;
+                    resize: vertical;
+                    outline: none;
+                    box-sizing: border-box;
+                }
+                .editor-textarea:focus {
+                    border-color: #74B9FF;
+                    background: rgba(255, 255, 255, 0.15);
+                }
+                .editor-buttons {
+                    display: flex;
+                    gap: 10px;
+                    margin-top: 15px;
+                    justify-content: flex-end;
+                }
+                .save-btn, .cancel-btn {
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 600;
+                    transition: all 0.2s ease;
+                }
+                .save-btn {
+                    background: #28a745;
+                    color: white;
+                }
+                .save-btn:hover {
+                    background: #218838;
+                }
+                .cancel-btn {
+                    background: #6c757d;
+                    color: white;
+                }
+                .cancel-btn:hover {
+                    background: #5a6268;
+                }
+                .help-text {
+                    color: #888;
+                    font-size: 12px;
+                    margin-top: 10px;
+                    text-align: center;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="floating-editor">
+                <h2>Personal Note</h2>
+                <textarea class="editor-textarea" id="noteContent" placeholder="Enter your note content here...">${this.escapeHtml(initialContent)}</textarea>
+                <div class="help-text">Perfect for code snippets, ideas, or any notes you want to remember!</div>
+                <div class="editor-buttons">
+                    <button class="cancel-btn" id="cancelBtn">Cancel</button>
+                    <button class="save-btn" id="saveBtn">Save Note</button>
+                </div>
+            </div>
+
+            <script>
+                const vscode = acquireVsCodeApi();
+                const textarea = document.getElementById('noteContent');
+                const saveBtn = document.getElementById('saveBtn');
+                const cancelBtn = document.getElementById('cancelBtn');
+
+                // Focus and select text on load
+                textarea.focus();
+                if (textarea.value) {
+                    textarea.select();
+                }
+
+                // Save button handler
+                saveBtn.addEventListener('click', () => {
+                    const content = textarea.value.trim();
+                    if (content) {
+                        vscode.postMessage({
+                            type: 'saveNote',
+                            content: content
+                        });
+                    } else {
+                        alert('Please enter some content for your note.');
+                    }
+                });
+
+                // Cancel button handler
+                cancelBtn.addEventListener('click', () => {
+                    vscode.postMessage({
+                        type: 'cancelNote'
+                    });
+                });
+
+                // Handle Enter key (Ctrl+Enter to save)
+                textarea.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey && e.key === 'Enter') {
+                        saveBtn.click();
+                    } else if (e.key === 'Escape') {
+                        cancelBtn.click();
+                    }
+                });
+            </script>
+        </body>
+        </html>`;
+    }
+
+    /**
+     * Get inline editor HTML content (compact version)
+     */
+    getInlineEditorHTML(initialContent = '') {
+        return `<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Quick Note</title>
+            <style>
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    padding: 15px;
+                    background: #1e1e1e;
+                    margin: 0;
+                    height: 100vh;
+                    overflow: hidden;
+                }
+                .inline-editor {
+                    background: #2d2d30;
+                    border: 1px solid #3e3e42;
+                    border-radius: 6px;
+                    padding: 15px;
+                    height: calc(100vh - 30px);
+                    display: flex;
+                    flex-direction: column;
+                }
+                .editor-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 10px;
+                    padding-bottom: 8px;
+                    border-bottom: 1px solid #3e3e42;
+                }
+                .editor-title {
+                    color: #cccccc;
+                    font-size: 14px;
+                    font-weight: 600;
+                    margin: 0;
+                }
+                .close-btn {
+                    background: none;
+                    border: none;
+                    color: #cccccc;
+                    cursor: pointer;
+                    font-size: 16px;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                }
+                .close-btn:hover {
+                    background: #3e3e42;
+                }
+                .editor-textarea {
+                    flex: 1;
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid #3e3e42;
+                    border-radius: 4px;
+                    background: #1e1e1e;
+                    color: #cccccc;
+                    font-family: 'Courier New', monospace;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    resize: none;
+                    outline: none;
+                    box-sizing: border-box;
+                }
+                .editor-textarea:focus {
+                    border-color: #007acc;
+                }
+                .editor-buttons {
+                    display: flex;
+                    gap: 8px;
+                    margin-top: 10px;
+                    justify-content: flex-end;
+                }
+                .save-btn, .cancel-btn {
+                    padding: 6px 12px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 12px;
+                    font-weight: 600;
+                    transition: all 0.2s ease;
+                }
+                .save-btn {
+                    background: #0e639c;
+                    color: white;
+                }
+                .save-btn:hover {
+                    background: #1177bb;
+                }
+                .cancel-btn {
+                    background: #5a5a5a;
+                    color: white;
+                }
+                .cancel-btn:hover {
+                    background: #6a6a6a;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="inline-editor">
+                <div class="editor-header">
+                    <h3 class="editor-title">📝 Quick Note</h3>
+                    <button class="close-btn" id="closeBtn">×</button>
+                </div>
+                <textarea class="editor-textarea" id="noteContent" placeholder="Type your note here...">${this.escapeHtml(initialContent)}</textarea>
+                <div class="editor-buttons">
+                    <button class="cancel-btn" id="cancelBtn">Cancel</button>
+                    <button class="save-btn" id="saveBtn">Save</button>
+                </div>
+            </div>
+
+            <script>
+                const vscode = acquireVsCodeApi();
+                const textarea = document.getElementById('noteContent');
+                const saveBtn = document.getElementById('saveBtn');
+                const cancelBtn = document.getElementById('cancelBtn');
+                const closeBtn = document.getElementById('closeBtn');
+
+                // Focus and select text on load
+                textarea.focus();
+                if (textarea.value) {
+                    textarea.select();
+                }
+
+                // Save button handler
+                saveBtn.addEventListener('click', () => {
+                    const content = textarea.value.trim();
+                    if (content) {
+                        vscode.postMessage({
+                            type: 'saveNote',
+                            content: content
+                        });
+                    } else {
+                        alert('Please enter some content for your note.');
+                    }
+                });
+
+                // Cancel button handler
+                cancelBtn.addEventListener('click', () => {
+                    vscode.postMessage({
+                        type: 'cancelNote'
+                    });
+                });
+
+                // Close button handler
+                closeBtn.addEventListener('click', () => {
+                    vscode.postMessage({
+                        type: 'cancelNote'
+                    });
+                });
+
+                // Handle keyboard shortcuts
+                textarea.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey && e.key === 'Enter') {
+                        saveBtn.click();
+                    } else if (e.key === 'Escape') {
+                        cancelBtn.click();
+                    }
+                });
+            </script>
+        </body>
+        </html>`;
+    }
+
 
     /**
      * Get webview HTML content
@@ -428,7 +846,7 @@ class NoteManager {
         <body>
             <div class="container">
             <h1 style="display: flex; justify-content: space-between; align-items: center; color: white;">
-                <span>My Post-It Notes</span>
+                <span>My PostIts</span>
                 ${this.notes.length > 0 ? `
                     <button id="deleteAll" style="
                         background: rgba(255, 50, 50, 0.85);
@@ -442,12 +860,9 @@ class NoteManager {
                     ">Delete All</button>
                 ` : ''}
             </h1>
-                <h1> My Post-It Notes</h1>
                 ${this.notes.length === 0 ? `
                     <div class="empty-state">
-                        <div class="empty-state-icon">📝</div>
-                        <h2>No notes yet!</h2>
-                        <p>Use the "Add Note" command to create your first Post-It note.</p>
+                        <h2>No existing notes</h2>
                     </div>
                 ` : `
                     <div class="notes-grid">
