@@ -40,6 +40,14 @@
       {
         "command": "test.addNoteFromSelection",
         "title": "Add Selected Text as Note"
+      },
+      {
+        "command": "extension.getUserEmail",
+        "title": "Get User Email"
+      },
+      {
+        "command": "extension.clearEmail",
+        "title": "Clear Stored Email"
       }
     ],
     "menus": {

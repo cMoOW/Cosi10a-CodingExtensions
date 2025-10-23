@@ -6,13 +6,28 @@ const vscode = require('vscode');
 const { sendHelloEmail } = require('./src/send-email.js');
 const { NoteManager } = require('./PostIt/noteManager');
 
+const EMAIL_KEY = 'myExtension.userEmail';
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
-
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+
+    // --- NEW COMMAND TO CLEAR EMAIL ---
+    let clearEmailDisposable = vscode.commands.registerCommand('extension.clearEmail', async () => {
+        // 1. Clear our stored email
+        await context.globalState.update(EMAIL_KEY, undefined);
+        vscode.window.showInformationMessage('Your stored email has been cleared.');
+    });
+    context.subscriptions.push(clearEmailDisposable);
+
+    // Command to get email
+    let getEmailDisposable = vscode.commands.registerCommand('extension.getUserEmail', () => {
+        getUserEmail(context);
+    });
+    context.subscriptions.push(getEmailDisposable);
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
@@ -85,24 +100,32 @@ function activate(context) {
 			}
 		);
 	
-		panel.webview.html = getEmailFormHTML();
+		panel.webview.html = getEmailFormHTML(context);
 	
 		// Listen for messages from the webview
 		panel.webview.onDidReceiveMessage(async (message) => {
 			if (message.type === 'submitEmailForm') {
-				const { email, userMessage } = message.data;
-	
+				const { userEmail, recipientEmail, userMessage } = message.data;
+
 				// Validate multiple emails
-				const emails = email.split(',').map(e => e.trim());
+				const emails = recipientEmail.split(',').map(e => e.trim());
 				const invalidEmails = emails.filter(e => !e.endsWith('@brandeis.edu'));
-				
+
+                const userEmailValid = userEmail.endsWith('@brandeis.edu');
+                if (!userEmailValid) {
+                    vscode.window.showErrorMessage(`Your email must be a valid Brandeis email address.`);
+                    return;
+                }
 				if (invalidEmails.length > 0) {
 					vscode.window.showErrorMessage(`Invalid Brandeis emails: ${invalidEmails.join(', ')}`);
 					return;
 				}
 	
 				try {
-					await sendHelloEmail(highlightedText, documentText, email, userMessage);
+                    // Store the user's email for future use
+                    context.globalState.update(EMAIL_KEY, userEmail);
+                    // Call the email service with all the user's input
+                    await sendHelloEmail(highlightedText, documentText, userEmail,recipientEmail, userMessage);
 					vscode.window.showInformationMessage('Email successfully sent!');
 					panel.dispose();
 	
@@ -191,98 +214,126 @@ function activate(context) {
 }
 
 
-function getEmailFormHTML() {
+function getEmailFormHTML(context) {
+    // Retrieve stored user email if available
+    const storedEmail = context.globalState.get(EMAIL_KEY);
+    if (storedEmail) {
+        console.log('Retrieved stored email:', storedEmail);
+    }
     return `
     <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Email Code Snippet</title>
-        <style>
-            body {
-                font-family: 'Segoe UI', Tahoma, sans-serif;
-                padding: 20px;
-                background: #1e1e1e;
-                color: #fff;
-            }
-            h2 {
-                text-align: center;
-                color: #fff;
-                margin-bottom: 20px;
-            }
-            form {
-                display: flex;
-                flex-direction: column;
-                gap: 15px;
-                background: #2c2c2c;
-                border-radius: 8px;
-                padding: 20px;
-                box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            }
-            label {
-                font-weight: 500;
-            }
-            input, textarea {
-                width: 100%;
-                padding: 10px;
-                border-radius: 4px;
-                border: none;
-                font-size: 14px;
-                background: #3a3a3a;
-                color: white;
-                outline: none;
-            }
-            input:focus, textarea:focus {
-                border: 1px solid #74B9FF;
-            }
-            button {
-                background: #74B9FF;
-                color: #1e1e1e;
-                padding: 10px 15px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-weight: bold;
-                transition: 0.2s ease;
-            }
-            button:hover {
-                background: #5aa0e6;
-            }
-        </style>
-    </head>
-    <body>
-        <h2>Send Your Code Snippet</h2>
-        <form id="emailForm">
-            <div>
-                <label for="email">Brandeis Email(s):</label>
-                <input type="text" id="email" placeholder="name@brandeis.edu, name1@brandeis.edu, ... required />
-                <small style="color: #888; font-size: 12px;">Separate multiple emails with commas</small>
-            </div>
-            <div>
-                <label for="message">Message:</label>
-                <textarea id="message" rows="4" placeholder="Enter your message..." required></textarea>
-            </div>
-            <button type="submit">Send Email</button>
-        </form>
+<html lang="en">
+<head>
+    <meta charset="UTF-R">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Code Snippet</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #fff;
+        }
+        h2 {
+            text-align: center;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: #2c2c2c;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        label {
+            font-weight: 500;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            border: none;
+            font-size: 14px;
+            background: #3a3a3a;
+            color: white;
+            outline: none;
+            box-sizing: border-box; /* Added for consistent padding */
+        }
+        input:focus, textarea:focus {
+            border: 1px solid #74B9FF;
+        }
+        button {
+            background: #74B9FF;
+            color: #1e1e1e;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s ease;
+        }
+        button:hover {
+            background: #5aa0e6;
+        }
+    </style>
+</head>
+<body>
+    <h2>Send Your Code Snippet</h2>
+    <form id="emailForm">
+        <div>
+            <label for="userEmail">Your Brandeis Email:</label>
+            <input type="email" id="userEmail" value="${storedEmail || ''}" placeholder="name@brandeis.edu" required />
+        </div>
+        
+        <div>
+            <label for="recipientEmail">Recipient Email(s):</label>
+            <input type="text" id="recipientEmail" placeholder="name@brandeis.edu, name1@brandeis.edu, ..." required />
+            <small style="color: #888; font-size: 12px;">Separate multiple emails with commas</small>
+        </div>
 
-        <script>
-            const vscode = acquireVsCodeApi();
-            document.getElementById('emailForm').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const email = document.getElementById('email').value.trim();
-                const userMessage = document.getElementById('message').value.trim();
-                vscode.postMessage({
-                    type: 'submitEmailForm',
-                    data: { email, userMessage }
-                });
+        <div>
+            <label for="message">Message:</label>
+            <textarea id="message" rows="4" placeholder="Enter your message..." required></textarea>
+        </div>
+        <button type="submit">Send Email</button>
+    </form>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        document.getElementById('emailForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Get all three values
+            const userEmail = document.getElementById('userEmail').value.trim();
+            const recipientEmail = document.getElementById('recipientEmail').value.trim();
+            const message = document.getElementById('message').value.trim();
+            
+            // Post all three values
+            vscode.postMessage({
+                type: 'submitEmailForm',
+                data: { userEmail, recipientEmail, message }
             });
-        </script>
-    </body>
-    </html>
+        });
+    </script>
+</body>
+</html>
     `;
 }
 
+async function getUserEmail(context) {
+    const storedEmail = context.globalState.get(EMAIL_KEY);
+    if (storedEmail) {
+        vscode.window.showInformationMessage(`Your stored email is: ${storedEmail}`);
+        return storedEmail;
+    }else{
+        vscode.window.showInformationMessage('No stored email found.');
+        return null;
+    }
+
+}
 
 /**
  * Handles the logic for the "helloWorld" command.
