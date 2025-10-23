@@ -32,7 +32,7 @@ function activate(context) {
 	});
 	
 	// Set initial status bar text
-	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`; 
 
 	// Helper function to update status bar (now handled by callback)
 	const updateStatusBar = async () => {

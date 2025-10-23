@@ -183,6 +183,50 @@ class NoteManager {
 
     }
 
+    async sendNoteEmail(note, emails) {
+        try {
+            // Import the sendHelloEmail function
+            const { sendHelloEmail } = require('../src/send-email');
+            
+            // Validate emails
+            const emailList = emails.split(',').map(email => email.trim()).filter(email => email);
+            const brandeisEmails = emailList.filter(email => email.endsWith('@brandeis.edu'));
+            
+            if (brandeisEmails.length === 0) {
+                vscode.window.showErrorMessage('Please enter at least one valid Brandeis email address.');
+                return;
+            }
+
+            // Create email content
+            const emailContent = `
+Post-It Note Content:
+
+${note.content}
+
+---
+Created: ${new Date(note.timestamp).toLocaleString()}
+Sent from VS Code Post-It Extension
+            `.trim();
+
+            // Send email
+            await sendHelloEmail(note.content, emailContent, brandeisEmails.join(','), 'Post-It Note from VS Code Extension');
+            
+            vscode.window.showInformationMessage(`Note emailed to: ${brandeisEmails.join(', ')}`);
+            
+            // Exit email mode
+            if (this.activePanel) {
+                this.activePanel.webview.postMessage({ 
+                    type: 'exitEmailMode', 
+                    noteId: note.id
+                });
+            }
+            
+        } catch (error) {
+            console.error('Error sending note email:', error);
+            vscode.window.showErrorMessage(`Failed to send email: ${error.message}`);
+        }
+    }
+
     /**
      * View all notes
      */
@@ -274,6 +318,38 @@ class NoteManager {
                 });
             }
 
+            //handles toggling email mode for a note
+            if (message.type === 'toggleEmailMode') {
+                const noteId = parseInt(message.noteId);
+                const note = this.notes.find(n => n.id === noteId);
+                if (!note) return;
+            
+                // Toggle email mode in the webview
+                panel.webview.postMessage({ 
+                    type: 'toggleEmailMode', 
+                    noteId: noteId
+                });
+            }
+
+            //handles sending email for a note
+            if (message.type === 'sendNoteEmail') {
+                const noteId = parseInt(message.noteId);
+                const emails = message.emails;
+                const note = this.notes.find(n => n.id === noteId);
+                if (!note) return;
+            
+                await this.sendNoteEmail(note, emails);
+            }
+
+            //handles canceling email mode
+            if (message.type === 'cancelEmail') {
+                const noteId = parseInt(message.noteId);
+                panel.webview.postMessage({ 
+                    type: 'exitEmailMode', 
+                    noteId: noteId
+                });
+            }
+
             //handles saving edited note content
             if (message.type === 'saveNoteEdit') {
                 const noteId = parseInt(message.noteId);
@@ -284,7 +360,7 @@ class NoteManager {
                     note.content = newContent.trim();
                     note.timestamp = new Date().toISOString();
                     await this.saveNotes();
-                    
+            
                     // Exit edit mode and refresh
                     panel.webview.postMessage({ 
                         type: 'exitEditMode', 
@@ -327,7 +403,7 @@ class NoteManager {
             console.log('Saved', this.notes.length, 'notes to file');
             
             // Also save to global state as backup
-            await this.context.globalState.update('postItNotes', this.notes);
+        await this.context.globalState.update('postItNotes', this.notes);
             
             // Notify that notes have changed
             this.notifyNotesChanged();
@@ -426,6 +502,99 @@ class NoteManager {
                 }
                 .cancel-btn:hover {
                     background: #5a6268;
+                }
+                .postit-email {
+                    margin-top: 10px;
+                }
+                .email-input {
+                    width: 100%;
+                    padding: 8px;
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    border-radius: 4px;
+                    background: rgba(255, 255, 255, 0.1);
+                    color: white;
+                    font-size: 12px;
+                    outline: none;
+                    margin-bottom: 8px;
+                }
+                .email-input:focus {
+                    border-color: #74B9FF;
+                    background: rgba(255, 255, 255, 0.15);
+                }
+                .email-input::placeholder {
+                    color: rgba(255, 255, 255, 0.6);
+                }
+                .email-buttons {
+                    display: flex;
+                    gap: 6px;
+                }
+                .send-email-btn, .cancel-email-btn {
+                    padding: 4px 8px;
+                    border: none;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    font-size: 11px;
+                    font-weight: 600;
+                    transition: all 0.2s ease;
+                }
+                .send-email-btn {
+                    background: #28a745;
+                    color: white;
+                }
+                .send-email-btn:hover {
+                    background: #218838;
+                }
+                .cancel-email-btn {
+                    background: #6c757d;
+                    color: white;
+                }
+                .cancel-email-btn:hover {
+                    background: #5a6268;
+                }
+                .postit-footer {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-top: 10px;
+                    padding-top: 10px;
+                    border-top: 1px solid rgba(0,0,0,0.1);
+                    flex-shrink: 0;
+                }
+                .email-btn {
+                    background: #007bff;
+                    border: none;
+                    color: white;
+                    font-size: 12px;
+                    border-radius: 3px;
+                    padding: 4px 8px;
+                    cursor: pointer;
+                    transition: background 0.2s ease;
+                    font-weight: 600;
+                }
+                .email-btn:hover {
+                    background: #0056b3;
+                }
+                .expand-btn {
+                    background: rgba(108, 117, 125, 0.1);
+                    border: none;
+                    color: #6c757d;
+                    font-size: 10px;
+                    border-radius: 2px;
+                    padding: 2px 4px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    opacity: 0.7;
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    z-index: 5;
+                }
+                .expand-btn:hover {
+                    background: rgba(108, 117, 125, 0.3);
+                    opacity: 1;
+                }
+                .expand-btn.expanded {
+                    transform: rotate(180deg);
                 }
                 .help-text {
                     color: #888;
@@ -597,7 +766,7 @@ class NoteManager {
         <body>
             <div class="inline-editor">
                 <div class="editor-header">
-                    <h3 class="editor-title">📝 Quick Note</h3>
+                    <h3 class="editor-title"> Quick Note</h3>
                     <button class="close-btn" id="closeBtn">×</button>
                 </div>
                 <textarea class="editor-textarea" id="noteContent" placeholder="Type your note here...">${this.escapeHtml(initialContent)}</textarea>
@@ -665,23 +834,42 @@ class NoteManager {
      * Get webview HTML content
      */
     getWebviewContent() {
-        const notesHtml = this.notes.map(note => `
+        const notesHtml = this.notes.map(note => {
+            // Check if content is long enough to need expand button
+            const needsExpand = note.content.length > 200 || note.content.split('\n').length > 6;
+            const expandButtonStyle = needsExpand ? '' : 'display: none;';
+            
+            return `
             <div class="postit" style="background-color: ${note.color}" data-id="${note.id}">
                 <div class="postit-header">
                     <span class="postit-date">${new Date(note.timestamp).toLocaleDateString()}</span>
                     <button class="delete-btn" title="Delete Note">×</button>
                 </div>
-                <div class="postit-content" id="content-${note.id}">${this.escapeHtml(note.content)}</div>
-                <div class="postit-edit" id="edit-${note.id}" style="display: none;">
-                    <textarea class="edit-textarea" id="textarea-${note.id}" placeholder="Edit your note...">${this.escapeHtml(note.content)}</textarea>
-                    <div class="edit-buttons">
-                        <button class="save-btn" data-id="${note.id}">Save</button>
-                        <button class="cancel-btn" data-id="${note.id}">Cancel</button>
+                <div class="postit-content-wrapper">
+                    <div class="postit-content" id="content-${note.id}">${this.escapeHtml(note.content)}</div>
+                    <button class="expand-btn" title="Expand/Collapse Note" data-id="${note.id}" style="${expandButtonStyle}">▼</button>
+                    <div class="postit-edit" id="edit-${note.id}" style="display: none;">
+                        <textarea class="edit-textarea" id="textarea-${note.id}" placeholder="Edit your note...">${this.escapeHtml(note.content)}</textarea>
+                        <div class="edit-buttons">
+                            <button class="save-btn" data-id="${note.id}">Save</button>
+                            <button class="cancel-btn" data-id="${note.id}">Cancel</button>
+                        </div>
+                    </div>
+                    <div class="postit-email" id="email-${note.id}" style="display: none;">
+                        <input type="text" class="email-input" id="emailInput-${note.id}" placeholder="Enter email(s): student@brandeis.edu, ta@brandeis.edu" />
+                        <div class="email-buttons">
+                            <button class="send-email-btn" data-id="${note.id}">Send Email</button>
+                            <button class="cancel-email-btn" data-id="${note.id}">Cancel</button>
+                        </div>
                     </div>
                 </div>
-                <button class="edit-btn" title="Edit Note">Edit</button>
+                <div class="postit-footer">
+                    <button class="email-btn" title="Email Note" data-id="${note.id}">Email</button>
+                    <button class="edit-btn" title="Edit Note">Edit</button>
+                </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         return `<!DOCTYPE html>
         <html lang="en">
@@ -717,9 +905,17 @@ class NoteManager {
                     border-radius: 3px;
                     box-shadow: 5px 5px 15px rgba(0,0,0,0.3);
                     transform: rotate(-2deg);
-                    transition: transform 0.3s ease, box-shadow 0.3s ease;
-                    min-height: 150px;
+                    transition: all 0.3s ease;
+                    width: 280px;
+                    height: 200px;
                     position: relative;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+                .postit.expanded {
+                    height: auto;
+                    min-height: 200px;
                 }
                 .postit:hover {
                     transform: rotate(0deg) scale(1.05);
@@ -739,6 +935,40 @@ class NoteManager {
                     margin-bottom: 10px;
                     padding-bottom: 8px;
                     border-bottom: 1px solid rgba(0,0,0,0.1);
+                    flex-shrink: 0;
+                }
+                .postit-content-wrapper {
+                    flex: 1;
+                    overflow: hidden;
+                    position: relative;
+                    padding-right: 20px;
+                }
+                .postit-content {
+                    line-height: 1.4;
+                    color: #333;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 6;
+                    -webkit-box-orient: vertical;
+                    transition: all 0.3s ease;
+                    max-height: 120px;
+                }
+                .postit-content.expanded {
+                    -webkit-line-clamp: unset;
+                    overflow: visible;
+                    max-height: none;
+                    display: block;
+                }
+                .postit-footer {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-top: 10px;
+                    padding-top: 10px;
+                    border-top: 1px solid rgba(0,0,0,0.1);
+                    flex-shrink: 0;
+                    gap: 8px;
                 }
                 .postit-date {
                     font-size: 11px;
@@ -894,6 +1124,39 @@ class NoteManager {
                     });
                 });
 
+                // Add event listeners for email buttons
+                document.querySelectorAll('.email-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const noteId = e.target.getAttribute('data-id');
+                        vscode.postMessage({ type: 'toggleEmailMode', noteId: noteId });
+                    });
+                });
+
+                // Add event listeners for expand buttons
+                document.querySelectorAll('.expand-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const noteId = e.target.getAttribute('data-id');
+                        const noteElement = e.target.closest('.postit');
+                        const content = document.getElementById('content-' + noteId);
+                        const expandBtn = e.target;
+                        
+                        if (noteElement.classList.contains('expanded')) {
+                            noteElement.classList.remove('expanded');
+                            content.classList.remove('expanded');
+                            expandBtn.textContent = '▼';
+                            expandBtn.classList.remove('expanded');
+                        } else {
+                            noteElement.classList.add('expanded');
+                            content.classList.add('expanded');
+                            expandBtn.textContent = '▲';
+                            expandBtn.classList.add('expanded');
+                        }
+                    });
+                });
+
                 // Handle save and cancel buttons for inline editing
                 document.querySelectorAll('.save-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
@@ -918,12 +1181,39 @@ class NoteManager {
                     });
                 });
 
+                // Handle email form buttons
+                document.querySelectorAll('.send-email-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const noteId = e.target.getAttribute('data-id');
+                        const emailInput = document.getElementById('emailInput-' + noteId);
+                        const emails = emailInput.value.trim();
+                        if (emails) {
+                            vscode.postMessage({ 
+                                type: 'sendNoteEmail', 
+                                noteId: noteId, 
+                                emails: emails 
+                            });
+                        }
+                    });
+                });
+
+                document.querySelectorAll('.cancel-email-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const noteId = e.target.getAttribute('data-id');
+                        vscode.postMessage({ 
+                            type: 'cancelEmail', 
+                            noteId: noteId 
+                        });
+                    });
+                });
+
                 // Listen for messages from the extension
                 window.addEventListener('message', event => {
                     const message = event.data;
                     
                     if (message.type === 'toggleEditMode') {
                         const noteId = message.noteId;
+                        const noteElement = document.querySelector('.postit[data-id="' + noteId + '"]');
                         const contentDiv = document.getElementById('content-' + noteId);
                         const editDiv = document.getElementById('edit-' + noteId);
                         const textarea = document.getElementById('textarea-' + noteId);
@@ -931,6 +1221,9 @@ class NoteManager {
                         // Hide content, show edit mode
                         contentDiv.style.display = 'none';
                         editDiv.style.display = 'block';
+                        
+                        // Auto-expand note for long content
+                        noteElement.classList.add('expanded');
                         
                         // Set textarea content and focus
                         textarea.value = message.content;
@@ -940,12 +1233,40 @@ class NoteManager {
                     
                     if (message.type === 'exitEditMode') {
                         const noteId = message.noteId;
+                        const noteElement = document.querySelector('.postit[data-id="' + noteId + '"]');
                         const contentDiv = document.getElementById('content-' + noteId);
                         const editDiv = document.getElementById('edit-' + noteId);
                         
                         // Show content, hide edit mode
                         contentDiv.style.display = 'block';
                         editDiv.style.display = 'none';
+                        
+                        // Remove expanded class when exiting edit mode
+                        noteElement.classList.remove('expanded');
+                    }
+                    
+                    if (message.type === 'toggleEmailMode') {
+                        const noteId = message.noteId;
+                        const contentDiv = document.getElementById('content-' + noteId);
+                        const emailDiv = document.getElementById('email-' + noteId);
+                        const emailInput = document.getElementById('emailInput-' + noteId);
+                        
+                        // Hide content, show email mode
+                        contentDiv.style.display = 'none';
+                        emailDiv.style.display = 'block';
+                        
+                        // Focus email input
+                        emailInput.focus();
+                    }
+                    
+                    if (message.type === 'exitEmailMode') {
+                        const noteId = message.noteId;
+                        const contentDiv = document.getElementById('content-' + noteId);
+                        const emailDiv = document.getElementById('email-' + noteId);
+                        
+                        // Show content, hide email mode
+                        contentDiv.style.display = 'block';
+                        emailDiv.style.display = 'none';
                     }
                 });
             </script>
