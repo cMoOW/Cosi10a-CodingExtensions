@@ -19,16 +19,26 @@ function activate(context) {
 	console.log('Congratulations, your extension "test" is now active!');
 	vscode.window.showInformationMessage('This extension is now active!');
 	
-	// Initialize Note Manager
-	const noteManager = new NoteManager(context);
-
 	// Create status bar item for notes
 	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 	statusBarItem.command = 'test.viewNotes';
-	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
 	statusBarItem.tooltip = 'Click to view your Post-It notes';
 	statusBarItem.show();
 	context.subscriptions.push(statusBarItem);
+
+	// Initialize Note Manager with callback for status bar updates
+	const noteManager = new NoteManager(context, (notesCount) => {
+		statusBarItem.text = `$(note) ${notesCount} notes`;
+	});
+	
+	// Set initial status bar text
+	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`; 
+
+	// Helper function to update status bar (now handled by callback)
+	const updateStatusBar = async () => {
+		await noteManager.refreshNotes();
+		// Status bar will be updated automatically by the callback
+	};
 
 	const disposable = vscode.commands.registerCommand('test.helloWorld', function () {
 		// The code you place here will be executed every time your command is executed
@@ -37,12 +47,34 @@ function activate(context) {
 		vscode.window.showInformationMessage('Hello world has been run');
 	});
 
-	// View Notes Command - NEW!
+	// View Notes Command
 	let viewNotesCommand = vscode.commands.registerCommand('test.viewNotes', async () => {
+		await updateStatusBar(); // Refresh notes before viewing
 		await noteManager.viewAllNotes();
 	});
 
-	async function sendEmailCommandHandler(highlightedText, documentText, noteManager, statusBarItem) {
+	// Add Note Command 
+	let addNoteCommand = vscode.commands.registerCommand('test.addNote', async () => {
+		await noteManager.showFloatingEditor();
+	});
+
+	// Add Note from Selection Command
+	let addNoteFromSelectionCommand = vscode.commands.registerCommand('test.addNoteFromSelection', async () => {
+		const editor = vscode.window.activeTextEditor;
+		if (editor) {
+			const selection = editor.selection;
+			const selectedText = editor.document.getText(selection);
+			
+			if (selectedText.trim()) {
+				await noteManager.showInlineNoteEditor(selectedText);
+			} else {
+				vscode.window.showWarningMessage('Please select some text to add as a note.');
+			}
+		}
+	});
+
+
+	async function sendEmailCommandHandler(highlightedText, documentText, noteManager) {
 		const panel = vscode.window.createWebviewPanel(
 			'emailPopup',
 			'Send Code Snippet via Email',
@@ -60,19 +92,23 @@ function activate(context) {
 			if (message.type === 'submitEmailForm') {
 				const { email, userMessage } = message.data;
 	
-				if (!email.endsWith('@brandeis.edu')) {
-					vscode.window.showErrorMessage('Please enter a valid Brandeis email.');
+				// Validate multiple emails
+				const emails = email.split(',').map(e => e.trim());
+				const invalidEmails = emails.filter(e => !e.endsWith('@brandeis.edu'));
+				
+				if (invalidEmails.length > 0) {
+					vscode.window.showErrorMessage(`Invalid Brandeis emails: ${invalidEmails.join(', ')}`);
 					return;
 				}
 	
 				try {
-					const messageId = await sendHelloEmail(highlightedText, documentText, email, userMessage);
+					await sendHelloEmail(highlightedText, documentText, email, userMessage);
 					vscode.window.showInformationMessage('Email successfully sent!');
 					panel.dispose();
 	
 					// Optional: Add the message as a Post-It note
 					await noteManager.addNote(userMessage);
-					statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+					await updateStatusBar(); // Refresh and update status bar
 
 				} catch (error) {
 					vscode.window.showErrorMessage('Failed to send email: ' + error.message);
@@ -125,7 +161,7 @@ function activate(context) {
 		if (editor) {
 			const selection = editor.selection;
 			const selectedText = editor.document.getText(selection);
-			sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager, statusBarItem);
+			sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager);
 		}
 	});
  
@@ -146,6 +182,8 @@ function activate(context) {
 	// Register all commands
 	context.subscriptions.push(disposable);
 	context.subscriptions.push(viewNotesCommand);
+	context.subscriptions.push(addNoteCommand);
+	context.subscriptions.push(addNoteFromSelectionCommand);
 	context.subscriptions.push(emailCodeDisposable);
 
 	// highlight TODO: Uncomment this line to enable the highlighter functionality
@@ -217,8 +255,9 @@ function getEmailFormHTML() {
         <h2>Send Your Code Snippet</h2>
         <form id="emailForm">
             <div>
-                <label for="email">Brandeis Email:</label>
-                <input type="email" id="email" placeholder="you@brandeis.edu" required />
+                <label for="email">Brandeis Email(s):</label>
+                <input type="text" id="email" placeholder="name@brandeis.edu, name1@brandeis.edu, ... required />
+                <small style="color: #888; font-size: 12px;">Separate multiple emails with commas</small>
             </div>
             <div>
                 <label for="message">Message:</label>
