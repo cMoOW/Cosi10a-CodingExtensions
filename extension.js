@@ -101,6 +101,13 @@ function activate(context) {
 		);
 	
 		panel.webview.html = getEmailFormHTML(context);
+		// In your extension.ts/js file, after creating the webview panel
+		const emailList = ["brianshen@brandeis.edu", "auppal@brandeis.edu", "jacobcarminati@brandeis.edu", "siminglin@brandeis.edu"];
+
+		panel.webview.postMessage({
+    		type: 'loadEmails',
+    		emails: emailList
+		});
 	
 		// Listen for messages from the webview
 		panel.webview.onDidReceiveMessage(async (message) => {
@@ -224,7 +231,7 @@ function getEmailFormHTML(context) {
     <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-R">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Email Code Snippet</title>
     <style>
@@ -251,7 +258,9 @@ function getEmailFormHTML(context) {
         label {
             font-weight: 500;
         }
-        input, textarea {
+        /* Base styles for inputs */
+        input[type="email"], 
+        textarea {
             width: 100%;
             padding: 10px;
             border-radius: 4px;
@@ -260,11 +269,79 @@ function getEmailFormHTML(context) {
             background: #3a3a3a;
             color: white;
             outline: none;
-            box-sizing: border-box; /* Added for consistent padding */
+            box-sizing: border-box; 
         }
-        input:focus, textarea:focus {
+        input[type="email"]:focus, 
+        textarea:focus {
             border: 1px solid #74B9FF;
         }
+
+        /* --- NEW CSS for Custom Dropdown --- */
+
+        .multiselect-container {
+            position: relative; /* Allows dropdown to be positioned below */
+        }
+
+        /* This is the box that looks like an input */
+        .select-box {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            background: #3a3a3a;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            box-sizing: border-box;
+            user-select: none; /* Prevents text selection on click */
+        }
+        .select-box:focus {
+            border: 1px solid #74B9FF;
+        }
+        .select-box .placeholder {
+            color: #888;
+        }
+
+        /* This is the dropdown panel that hides/shows */
+        .dropdown-options {
+            display: none; /* Hidden by default */
+            position: absolute;
+            top: 100%; /* Position right below the select box */
+            left: 0;
+            width: 100%;
+            background: #3a3a3a;
+            border: 1px solid #74B9FF;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 10;
+        }
+        .dropdown-options.show {
+            display: block; /* Show the dropdown */
+        }
+        
+        /* Individual checkbox options */
+        .dropdown-option {
+            display: block;
+            padding: 10px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .dropdown-option:hover {
+            background: #5aa0e6;
+        }
+        .dropdown-option input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .dropdown-option.disabled {
+            color: #888;
+            cursor: default;
+            background: none;
+        }
+
+        /* --- End Custom Dropdown CSS --- */
+
         button {
             background: #74B9FF;
             color: #1e1e1e;
@@ -284,16 +361,23 @@ function getEmailFormHTML(context) {
     <h2>Send Your Code Snippet</h2>
     <form id="emailForm">
         <div>
-            <label for="userEmail">Your Brandeis Email:</label>
-            <input type="email" id="userEmail" value="${storedEmail || ''}" placeholder="name@brandeis.edu" required />
+            <label for="userEmail">Your Email:</label>
+            <input type="email" id="userEmail" value="${storedEmail || ''}" placeholder="your-email@brandeis.edu" required />
         </div>
         
         <div>
-            <label for="recipientEmail">Recipient Email(s):</label>
-            <input type="text" id="recipientEmail" placeholder="name@brandeis.edu, name1@brandeis.edu, ..." required />
-            <small style="color: #888; font-size: 12px;">Separate multiple emails with commas</small>
+            <label for="recipientSelectBox">Recipient Email(s):</label>
+            <div class="multiselect-container">
+                <div class="select-box" id="recipientSelectBox" tabindex="0">
+                    <span class="placeholder" id="recipientPlaceholder">Select recipients...</span>
+                </div>
+                <div id="recipientDropdown" class="dropdown-options">
+                    <label class="dropdown-option disabled">
+                        Loading emails...
+                    </label>
+                </div>
+            </div>
         </div>
-
         <div>
             <label for="message">Message:</label>
             <textarea id="message" rows="4" placeholder="Enter your message..." required></textarea>
@@ -303,15 +387,92 @@ function getEmailFormHTML(context) {
 
     <script>
         const vscode = acquireVsCodeApi();
+
+        const selectBox = document.getElementById('recipientSelectBox');
+        const dropdown = document.getElementById('recipientDropdown');
+        const placeholder = document.getElementById('recipientPlaceholder');
+
+        // --- NEW: Toggle dropdown visibility ---
+        selectBox.addEventListener('click', () => {
+            dropdown.classList.toggle('show');
+        });
+
+        // --- NEW: Close dropdown when clicking outside ---
+        window.addEventListener('click', (e) => {
+            if (!selectBox.contains(e.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
+
+        // --- NEW: Update placeholder text when checkboxes change ---
+        dropdown.addEventListener('change', () => {
+            const checkedInputs = dropdown.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkedInputs.length === 0) {
+                placeholder.textContent = 'Select recipients...';
+                placeholder.classList.add('placeholder');
+            } else if (checkedInputs.length === 1) {
+                placeholder.textContent = checkedInputs[0].value;
+                placeholder.classList.remove('placeholder');
+            } else {
+                placeholder.textContent = checkedInputs.length + ' recipients selected';
+                placeholder.classList.remove('placeholder');
+            }
+        });
+
+        // --- MODIFIED: Listen for emails from the extension ---
+        window.addEventListener('message', event => {
+            const message = event.data;
+            if (message.type === 'loadEmails' && Array.isArray(message.emails)) {
+                
+                // Clear "Loading..." message
+                dropdown.innerHTML = ''; 
+
+                // Populate with checkbox options
+                if (message.emails.length > 0) {
+                    message.emails.forEach(email => {
+                        const optionLabel = document.createElement('label');
+                        optionLabel.className = 'dropdown-option';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.value = email;
+                        
+                        optionLabel.appendChild(checkbox);
+                        optionLabel.appendChild(document.createTextNode(' ' + email));
+                        dropdown.appendChild(optionLabel);
+                    });
+                } else {
+                    // Show disabled message if no emails are loaded
+                    const disabledLabel = document.createElement('label');
+                    disabledLabel.className = 'dropdown-option disabled';
+                    disabledLabel.textContent = 'No emails found.';
+                    dropdown.appendChild(disabledLabel);
+                }
+            }
+        });
+
+        // --- MODIFIED: Listen for the form submit button ---
         document.getElementById('emailForm').addEventListener('submit', (e) => {
             e.preventDefault();
             
-            // Get all three values
             const userEmail = document.getElementById('userEmail').value.trim();
-            const recipientEmail = document.getElementById('recipientEmail').value.trim();
             const message = document.getElementById('message').value.trim();
+
+            // --- NEW: Get emails from checked boxes ---
+            const checkedInputs = dropdown.querySelectorAll('input[type="checkbox"]:checked');
+            const selectedEmails = Array.from(checkedInputs).map(input => input.value);
             
-            // Post all three values
+            // Simple validation since "required" doesn't work on custom elements
+            if (selectedEmails.length === 0) {
+                alert('Please select at least one recipient.');
+                // Focus the box for accessibility
+                selectBox.focus();
+                return; 
+            }
+            
+            const recipientEmail = selectedEmails.join(', ');
+            
+            // Post all three values back to the extension
             vscode.postMessage({
                 type: 'submitEmailForm',
                 data: { userEmail, recipientEmail, message }
