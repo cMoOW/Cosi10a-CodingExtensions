@@ -18,7 +18,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
  * This function returns a promise that resolves on success or rejects on failure.
  * @returns {Promise<string>} A promise that resolves with the message ID of the sent email.
  */
-async function sendHelloEmail(highlightedText,body, userEmail,recipientEmail, message) {
+async function sendEmail(highlightedText,body, userEmail,recipientEmail, message) {
     // DEBUG: Log the environment variables to check if they are loaded
   console.log('--- Checking Credentials ---');
   console.log('Email User:', process.env.EMAIL_USER);
@@ -62,5 +62,5 @@ async function sendHelloEmail(highlightedText,body, userEmail,recipientEmail, me
 
 // Export the function so it can be used in other files
 module.exports = {
-  sendHelloEmail,
+  sendEmail,
 };  

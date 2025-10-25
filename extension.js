@@ -3,13 +3,12 @@
 const vscode = require('vscode');
 // Import the highlighter functionality from the new file
 //const { activateHighlighter } = require('./src/highlight.js');
-const { sendHelloEmail } = require('./src/send-email.js');
+const { sendEmail } = require('./src/send-email.js');
 const { NoteManager } = require('./PostIt/noteManager');
 
 const EMAIL_KEY = 'myExtension.userEmail';
 
 // This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 /**
  * @param {vscode.ExtensionContext} context
  */
@@ -132,7 +131,7 @@ function activate(context) {
                     // Store the user's email for future use
                     context.globalState.update(EMAIL_KEY, userEmail);
                     // Call the email service with all the user's input
-                    await sendHelloEmail(highlightedText, documentText, userEmail,recipientEmail, userMessage);
+                    await sendEmail(highlightedText, documentText, userEmail,recipientEmail, userMessage);
 					vscode.window.showInformationMessage('Email successfully sent!');
 					panel.dispose();
 	
@@ -484,22 +483,19 @@ function getEmailFormHTML(context) {
     `;
 }
 
-async function getUserEmail(context) {
+function getUserEmail(context) {
     const storedEmail = context.globalState.get(EMAIL_KEY);
     if (storedEmail) {
-        vscode.window.showInformationMessage(`Your stored email is: ${storedEmail}`);
+        //vscode.window.showInformationMessage(`Your stored email is: ${storedEmail}`);
+		console.log('Retrieved stored email:', storedEmail);
         return storedEmail;
     }else{
-        vscode.window.showInformationMessage('No stored email found.');
+        //vscode.window.showInformationMessage('No stored email found.');
+		console.log('No stored email found.');
         return null;
     }
 
 }
-
-/**
- * Handles the logic for the "helloWorld" command.
- * It prompts the user for email details and calls the email service.
- */
 
 
 // This method is called when your extension is deactivated
@@ -507,5 +503,6 @@ function deactivate() {}
 
 module.exports = {
 	activate,
-	deactivate
+	deactivate,
+	getUserEmail
 }
