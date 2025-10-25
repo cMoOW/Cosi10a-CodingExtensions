@@ -57,7 +57,10 @@ suite('Extension Test Suite', () => {
 				get: () => [],
 				update: () => Promise.resolve()
 			},
-			subscriptions: []
+			subscriptions: [],
+			globalStorageUri: {
+                fsPath: 'mock/path/to/globalStorage' // This just needs to be a non-empty string
+            }
 		};
 		
 		const noteManager = new NoteManager(mockContext);
@@ -78,6 +81,10 @@ suite('Extension Test Suite', () => {
 				update: () => Promise.resolve()
 			},
 			subscriptions: []
+			,
+			globalStorageUri: {
+                fsPath: 'mock/path/to/globalStorage' // This just needs to be a non-empty string
+            }
 		};
 		
 		const noteManager = new NoteManager(mockContext);
