@@ -75,7 +75,7 @@ class EmailUIManager {
             flex-direction: column;
             box-sizing: border-box;
             max-width: none;
-            padding-bottom: 40px; /* Added extra padding for buttons */
+            padding-bottom: 25px; /* Added extra padding for buttons */
         }
         h2 {
             color: #cccccc;

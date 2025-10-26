@@ -728,6 +728,8 @@ Sent from VS Code Post-It Extension
                     height: calc(100vh - 30px);
                     display: flex;
                     flex-direction: column;
+                    padding-bottom: 25px; /* added space below the buttons */
+
                 }
                 .editor-header {
                     display: flex;
@@ -769,6 +771,8 @@ Sent from VS Code Post-It Extension
                     resize: none;
                     outline: none;
                     box-sizing: border-box;
+                    margin-bottom: 15px; /* adds space between text area and buttons */
+
                 }
                 .editor-textarea:focus {
                     border-color: #007acc;
@@ -778,6 +782,8 @@ Sent from VS Code Post-It Extension
                     gap: 8px;
                     margin-top: 10px;
                     justify-content: flex-end;
+                    margin-bottom: 10px; /* moves buttons slightly up */
+
                 }
                 .save-btn, .cancel-btn {
                     padding: 6px 12px;
