@@ -3,16 +3,30 @@
 const vscode = require('vscode');
 // Import the highlighter functionality from the new file
 //const { activateHighlighter } = require('./src/highlight.js');
-const { sendHelloEmail } = require('./src/send-email.js');
+const { sendEmail } = require('./src/send-email.js');
 const { NoteManager } = require('./PostIt/noteManager');
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+const EMAIL_KEY = 'myExtension.userEmail';
 
+// This method is called when your extension is activated
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+
+    // --- NEW COMMAND TO CLEAR EMAIL ---
+    let clearEmailDisposable = vscode.commands.registerCommand('extension.clearEmail', async () => {
+        // 1. Clear our stored email
+        await context.globalState.update(EMAIL_KEY, undefined);
+        vscode.window.showInformationMessage('Your stored email has been cleared.');
+    });
+    context.subscriptions.push(clearEmailDisposable);
+
+    // Command to get email
+    let getEmailDisposable = vscode.commands.registerCommand('extension.getUserEmail', () => {
+        getUserEmail(context);
+    });
+    context.subscriptions.push(getEmailDisposable);
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
@@ -85,24 +99,39 @@ function activate(context) {
 			}
 		);
 	
-		panel.webview.html = getEmailFormHTML();
+		panel.webview.html = getEmailFormHTML(context);
+		// In your extension.ts/js file, after creating the webview panel
+		const emailList = ["brianshen@brandeis.edu", "auppal@brandeis.edu", "jacobcarminati@brandeis.edu", "siminglin@brandeis.edu"];
+
+		panel.webview.postMessage({
+    		type: 'loadEmails',
+    		emails: emailList
+		});
 	
 		// Listen for messages from the webview
 		panel.webview.onDidReceiveMessage(async (message) => {
 			if (message.type === 'submitEmailForm') {
-				const { email, userMessage } = message.data;
-	
+				const { userEmail, recipientEmail, userMessage } = message.data;
+
 				// Validate multiple emails
-				const emails = email.split(',').map(e => e.trim());
+				const emails = recipientEmail.split(',').map(e => e.trim());
 				const invalidEmails = emails.filter(e => !e.endsWith('@brandeis.edu'));
-				
+
+                const userEmailValid = userEmail.endsWith('@brandeis.edu');
+                if (!userEmailValid) {
+                    vscode.window.showErrorMessage(`Your email must be a valid Brandeis email address.`);
+                    return;
+                }
 				if (invalidEmails.length > 0) {
 					vscode.window.showErrorMessage(`Invalid Brandeis emails: ${invalidEmails.join(', ')}`);
 					return;
 				}
 	
 				try {
-					await sendHelloEmail(highlightedText, documentText, email, userMessage);
+                    // Store the user's email for future use
+                    context.globalState.update(EMAIL_KEY, userEmail);
+                    // Call the email service with all the user's input
+                    await sendEmail(highlightedText, documentText, userEmail,recipientEmail, userMessage);
 					vscode.window.showInformationMessage('Email successfully sent!');
 					panel.dispose();
 	
@@ -191,103 +220,282 @@ function activate(context) {
 }
 
 
-function getEmailFormHTML() {
+function getEmailFormHTML(context) {
+    // Retrieve stored user email if available
+    const storedEmail = context.globalState.get(EMAIL_KEY);
+    if (storedEmail) {
+        console.log('Retrieved stored email:', storedEmail);
+    }
     return `
     <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Email Code Snippet</title>
-        <style>
-            body {
-                font-family: 'Segoe UI', Tahoma, sans-serif;
-                padding: 20px;
-                background: #1e1e1e;
-                color: #fff;
-            }
-            h2 {
-                text-align: center;
-                color: #fff;
-                margin-bottom: 20px;
-            }
-            form {
-                display: flex;
-                flex-direction: column;
-                gap: 15px;
-                background: #2c2c2c;
-                border-radius: 8px;
-                padding: 20px;
-                box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            }
-            label {
-                font-weight: 500;
-            }
-            input, textarea {
-                width: 100%;
-                padding: 10px;
-                border-radius: 4px;
-                border: none;
-                font-size: 14px;
-                background: #3a3a3a;
-                color: white;
-                outline: none;
-            }
-            input:focus, textarea:focus {
-                border: 1px solid #74B9FF;
-            }
-            button {
-                background: #74B9FF;
-                color: #1e1e1e;
-                padding: 10px 15px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-weight: bold;
-                transition: 0.2s ease;
-            }
-            button:hover {
-                background: #5aa0e6;
-            }
-        </style>
-    </head>
-    <body>
-        <h2>Send Your Code Snippet</h2>
-        <form id="emailForm">
-            <div>
-                <label for="email">Brandeis Email(s):</label>
-                <input type="text" id="email" placeholder="name@brandeis.edu, name1@brandeis.edu, ... required />
-                <small style="color: #888; font-size: 12px;">Separate multiple emails with commas</small>
-            </div>
-            <div>
-                <label for="message">Message:</label>
-                <textarea id="message" rows="4" placeholder="Enter your message..." required></textarea>
-            </div>
-            <button type="submit">Send Email</button>
-        </form>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Code Snippet</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #fff;
+        }
+        h2 {
+            text-align: center;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: #2c2c2c;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        label {
+            font-weight: 500;
+        }
+        /* Base styles for inputs */
+        input[type="email"], 
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            border: none;
+            font-size: 14px;
+            background: #3a3a3a;
+            color: white;
+            outline: none;
+            box-sizing: border-box; 
+        }
+        input[type="email"]:focus, 
+        textarea:focus {
+            border: 1px solid #74B9FF;
+        }
 
-        <script>
-            const vscode = acquireVsCodeApi();
-            document.getElementById('emailForm').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const email = document.getElementById('email').value.trim();
-                const userMessage = document.getElementById('message').value.trim();
-                vscode.postMessage({
-                    type: 'submitEmailForm',
-                    data: { email, userMessage }
-                });
+        /* --- NEW CSS for Custom Dropdown --- */
+
+        .multiselect-container {
+            position: relative; /* Allows dropdown to be positioned below */
+        }
+
+        /* This is the box that looks like an input */
+        .select-box {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            background: #3a3a3a;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            box-sizing: border-box;
+            user-select: none; /* Prevents text selection on click */
+        }
+        .select-box:focus {
+            border: 1px solid #74B9FF;
+        }
+        .select-box .placeholder {
+            color: #888;
+        }
+
+        /* This is the dropdown panel that hides/shows */
+        .dropdown-options {
+            display: none; /* Hidden by default */
+            position: absolute;
+            top: 100%; /* Position right below the select box */
+            left: 0;
+            width: 100%;
+            background: #3a3a3a;
+            border: 1px solid #74B9FF;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 10;
+        }
+        .dropdown-options.show {
+            display: block; /* Show the dropdown */
+        }
+        
+        /* Individual checkbox options */
+        .dropdown-option {
+            display: block;
+            padding: 10px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .dropdown-option:hover {
+            background: #5aa0e6;
+        }
+        .dropdown-option input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .dropdown-option.disabled {
+            color: #888;
+            cursor: default;
+            background: none;
+        }
+
+        /* --- End Custom Dropdown CSS --- */
+
+        button {
+            background: #74B9FF;
+            color: #1e1e1e;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s ease;
+        }
+        button:hover {
+            background: #5aa0e6;
+        }
+    </style>
+</head>
+<body>
+    <h2>Send Your Code Snippet</h2>
+    <form id="emailForm">
+        <div>
+            <label for="userEmail">Your Email:</label>
+            <input type="email" id="userEmail" value="${storedEmail || ''}" placeholder="your-email@brandeis.edu" required />
+        </div>
+        
+        <div>
+            <label for="recipientSelectBox">Recipient Email(s):</label>
+            <div class="multiselect-container">
+                <div class="select-box" id="recipientSelectBox" tabindex="0">
+                    <span class="placeholder" id="recipientPlaceholder">Select recipients...</span>
+                </div>
+                <div id="recipientDropdown" class="dropdown-options">
+                    <label class="dropdown-option disabled">
+                        Loading emails...
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div>
+            <label for="message">Message:</label>
+            <textarea id="message" rows="4" placeholder="Enter your message..." required></textarea>
+        </div>
+        <button type="submit">Send Email</button>
+    </form>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        const selectBox = document.getElementById('recipientSelectBox');
+        const dropdown = document.getElementById('recipientDropdown');
+        const placeholder = document.getElementById('recipientPlaceholder');
+
+        // --- NEW: Toggle dropdown visibility ---
+        selectBox.addEventListener('click', () => {
+            dropdown.classList.toggle('show');
+        });
+
+        // --- NEW: Close dropdown when clicking outside ---
+        window.addEventListener('click', (e) => {
+            if (!selectBox.contains(e.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
+
+        // --- NEW: Update placeholder text when checkboxes change ---
+        dropdown.addEventListener('change', () => {
+            const checkedInputs = dropdown.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkedInputs.length === 0) {
+                placeholder.textContent = 'Select recipients...';
+                placeholder.classList.add('placeholder');
+            } else if (checkedInputs.length === 1) {
+                placeholder.textContent = checkedInputs[0].value;
+                placeholder.classList.remove('placeholder');
+            } else {
+                placeholder.textContent = checkedInputs.length + ' recipients selected';
+                placeholder.classList.remove('placeholder');
+            }
+        });
+
+        // --- MODIFIED: Listen for emails from the extension ---
+        window.addEventListener('message', event => {
+            const message = event.data;
+            if (message.type === 'loadEmails' && Array.isArray(message.emails)) {
+                
+                // Clear "Loading..." message
+                dropdown.innerHTML = ''; 
+
+                // Populate with checkbox options
+                if (message.emails.length > 0) {
+                    message.emails.forEach(email => {
+                        const optionLabel = document.createElement('label');
+                        optionLabel.className = 'dropdown-option';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.value = email;
+                        
+                        optionLabel.appendChild(checkbox);
+                        optionLabel.appendChild(document.createTextNode(' ' + email));
+                        dropdown.appendChild(optionLabel);
+                    });
+                } else {
+                    // Show disabled message if no emails are loaded
+                    const disabledLabel = document.createElement('label');
+                    disabledLabel.className = 'dropdown-option disabled';
+                    disabledLabel.textContent = 'No emails found.';
+                    dropdown.appendChild(disabledLabel);
+                }
+            }
+        });
+
+        // --- MODIFIED: Listen for the form submit button ---
+        document.getElementById('emailForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const userEmail = document.getElementById('userEmail').value.trim();
+            const message = document.getElementById('message').value.trim();
+
+            // --- NEW: Get emails from checked boxes ---
+            const checkedInputs = dropdown.querySelectorAll('input[type="checkbox"]:checked');
+            const selectedEmails = Array.from(checkedInputs).map(input => input.value);
+            
+            // Simple validation since "required" doesn't work on custom elements
+            if (selectedEmails.length === 0) {
+                alert('Please select at least one recipient.');
+                // Focus the box for accessibility
+                selectBox.focus();
+                return; 
+            }
+            
+            const recipientEmail = selectedEmails.join(', ');
+            
+            // Post all three values back to the extension
+            vscode.postMessage({
+                type: 'submitEmailForm',
+                data: { userEmail, recipientEmail, message }
             });
-        </script>
-    </body>
-    </html>
+        });
+    </script>
+</body>
+</html>
     `;
 }
 
+function getUserEmail(context) {
+    const storedEmail = context.globalState.get(EMAIL_KEY);
+    if (storedEmail) {
+        //vscode.window.showInformationMessage(`Your stored email is: ${storedEmail}`);
+		console.log('Retrieved stored email:', storedEmail);
+        return storedEmail;
+    }else{
+        //vscode.window.showInformationMessage('No stored email found.');
+		console.log('No stored email found.');
+        return null;
+    }
 
-/**
- * Handles the logic for the "helloWorld" command.
- * It prompts the user for email details and calls the email service.
- */
+}
 
 
 // This method is called when your extension is deactivated
@@ -295,5 +503,6 @@ function deactivate() {}
 
 module.exports = {
 	activate,
-	deactivate
+	deactivate,
+	getUserEmail
 }
