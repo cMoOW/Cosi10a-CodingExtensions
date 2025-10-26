@@ -1,17 +1,10 @@
 const nodemailer  =  require('nodemailer'); 
 
-
-
-
 // emailService.js
 const path = require('path');
 
 // Ensure this path correctly points to the .env file in your project's root
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-
-
-
-
 
 /**
  * Sends an email using Nodemailer with pre-defined options.
