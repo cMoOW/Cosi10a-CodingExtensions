@@ -149,7 +149,7 @@ class NoteManager {
     );
 
     const iconPath = vscode.Uri.file(
-      path.join(this.context.extensionPath, "PostIt", "post_it_logo.png")
+      path.join(this.context.extensionPath, "PostIt", "post_it_storage.png") // Can also be post_it_logo
     );
     panel.iconPath = iconPath;
 
@@ -282,6 +282,11 @@ Sent from VS Code Post-It Extension
 
     // If there's already an active panel, just refresh it
     if (this.activePanel) {
+      const iconPath = vscode.Uri.file(
+        path.join(this.context.extensionPath, "PostIt", "post_it_storage.png")
+      );
+      this.activePanel.iconPath = iconPath;
+
       this.activePanel.webview.html = this.getWebviewContent();
       this.activePanel.reveal(vscode.ViewColumn.One);
       return;
@@ -324,7 +329,7 @@ Sent from VS Code Post-It Extension
               panel.webview.html = this.getWebviewContent(); // Refresh view
             }
           });
-
+        
         panel.webview.html = this.getWebviewContent(); // Refresh view
       }
 
@@ -428,6 +433,10 @@ Sent from VS Code Post-It Extension
         });
       }
     });
+    const iconPath = vscode.Uri.file(
+      path.join(this.context.extensionPath, "PostIt", "post_it_storage.png")
+    );
+    panel.iconPath = iconPath;
 
     panel.webview.html = this.getWebviewContent();
   }
@@ -784,6 +793,7 @@ Sent from VS Code Post-It Extension
                     display: flex;
                     gap: 8px;
                     margin-top: 10px;
+                    margin-bottom: 10px;
                     justify-content: flex-end;
                 }
                 .save-btn, .cancel-btn {

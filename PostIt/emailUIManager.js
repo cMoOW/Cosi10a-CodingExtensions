@@ -20,7 +20,7 @@ async showEmailEditor(initialContent = "", emailList = [], storedUserEmail = "")
   );
 
   const iconPath = vscode.Uri.file(
-    path.join(this.context.extensionPath, "PostIt", "post_it_logo.png")
+    path.join(this.context.extensionPath, "PostIt", "post_it_storage.png") // Can also be post_it_logo
   );
   panel.iconPath = iconPath;
 
@@ -82,7 +82,7 @@ async showEmailEditor(initialContent = "", emailList = [], storedUserEmail = "")
             flex-direction: column;
             box-sizing: border-box;
             max-width: none;
-            padding-bottom: 40px; /* Added extra padding for buttons */
+            padding-bottom: 25px; /* Added extra padding for buttons */
         }
         h2 {
             color: #cccccc;
@@ -105,7 +105,7 @@ async showEmailEditor(initialContent = "", emailList = [], storedUserEmail = "")
             color: #cccccc;
             font-size: 14px;
             line-height: 1.4;
-            margin-bottom: 14px;
+            margin-bottom: 0px;
             box-sizing: border-box;
         }
         textarea {
