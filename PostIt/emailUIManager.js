@@ -1,4 +1,5 @@
 const vscode = require("vscode");
+const path = require("path")
 
 class EmailUIManager {
   constructor(context) {
@@ -6,33 +7,39 @@ class EmailUIManager {
     this.panel = null;
   }
 
-  async showEmailEditor(initialContent = "", emailList = [], storedUserEmail = "") {
-    // Create a webview panel just like the note editor
-    const panel = vscode.window.createWebviewPanel(
-      "emailNoteEditor",
-      "Email Post-It Note",
-      vscode.ViewColumn.Beside,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: false,
-      }
-    );
+async showEmailEditor(initialContent = "", emailList = [], storedUserEmail = "") {
+  // Create a webview panel just like the note editor
+  const panel = vscode.window.createWebviewPanel(
+    "emailNoteEditor",
+    "Email Post-It Note", // This is the title of the tab
+    vscode.ViewColumn.Beside,
+    {
+      enableScripts: true,
+      retainContextWhenHidden: false,
+    }
+  );
 
-    panel.webview.html = this.getEmailEditorHTML(initialContent, emailList, storedUserEmail);
+  const iconPath = vscode.Uri.file(
+    path.join(this.context.extensionPath, "PostIt", "post_it_logo.png")
+  );
+  panel.iconPath = iconPath;
 
-    // Listen for messages from the webview
-    panel.webview.onDidReceiveMessage(async (message) => {
-      if (message.type === "sendEmail") {
-        // Pass this back to whoever created the EmailUIManager
-        if (this.onSendCallback) {
-          await this.onSendCallback(message.data);
-        }
-        this.panel.dispose();
-      } else if (message.type === "cancel") {
-        this.panel.dispose();
+  panel.webview.html = this.getEmailEditorHTML(initialContent, emailList, storedUserEmail);
+
+  // Listen for messages from the webview
+  panel.webview.onDidReceiveMessage(async (message) => {
+    if (message.type === "sendEmail") {
+      // Pass this back to whoever created the EmailUIManager
+      if (this.onSendCallback) {
+        await this.onSendCallback(message.data);
       }
-    });
-  }
+      this.panel.dispose();
+    } else if (message.type === "cancel") {
+      this.panel.dispose();
+    }
+  });
+}
+
 
   onSend(callback) {
     this.onSendCallback = callback;
@@ -75,7 +82,7 @@ class EmailUIManager {
             flex-direction: column;
             box-sizing: border-box;
             max-width: none;
-            padding-bottom: 25px; /* Added extra padding for buttons */
+            padding-bottom: 40px; /* Added extra padding for buttons */
         }
         h2 {
             color: #cccccc;
