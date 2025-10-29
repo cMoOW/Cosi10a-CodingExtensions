@@ -17,12 +17,12 @@ class NoteManager {
       this.notes.length,
       "existing notes"
     );
-    this.emailList = [
-      "brianshen@brandeis.edu",
-      "auppal@brandeis.edu",
-      "jacobcarminati@brandeis.edu",
-      "siminglin@brandeis.edu",
-    ];
+    this.emailList = {
+      "Brian Shen": "brianshen@brandeis.edu",
+      "Apoorva Uppal": "auppal@brandeis.edu",
+      "Jacob Carminati": "jacobcarminati@brandeis.edu",
+      "SiMing Lin": "siminglin@brandeis.edu",
+    };
   }
 
   /**
@@ -755,7 +755,7 @@ Sent from VS Code Post-It Extension
                 }
                 .editor-title {
                     color: #cccccc;
-                    font-size: 14px;
+                    font-size: 18px;
                     font-weight: 600;
                     margin: 0;
                 }
@@ -1355,32 +1355,32 @@ Sent from VS Code Post-It Extension
                 /**
                  * Populates all dropdowns on the page with the email list.
                  */
-                function populateAllDropdowns(emails) {
-                    document.querySelectorAll('.dropdown-options').forEach(dropdown => {
-                        dropdown.innerHTML = ''; // Clear "Loading..."
-                        
-                        if (emails && emails.length > 0) {
-                            emails.forEach(email => {
-                                const optionLabel = document.createElement('label');
-                                optionLabel.className = 'dropdown-option';
-                                
-                                const checkbox = document.createElement('input');
-                                checkbox.type = 'checkbox';
-                                checkbox.value = email;
-                                
-                                optionLabel.appendChild(checkbox);
-                                optionLabel.appendChild(document.createTextNode(' ' + email));
-                                dropdown.appendChild(optionLabel);
-                            });
-                        } else {
-                            const disabledLabel = document.createElement('label');
-                            disabledLabel.className = 'dropdown-option disabled';
-                            disabledLabel.textContent = 'No emails found.';
-                            dropdown.appendChild(disabledLabel);
-                        }
-                    });
-                }
+                function populateAllDropdowns(emailMap) {
+                  document.querySelectorAll('.dropdown-options').forEach(dropdown => {
+                    dropdown.innerHTML = '';
 
+                    const names = Object.keys(emailMap);
+                    if (names.length > 0) {
+                      names.forEach(name => {
+                        const email = emailMap[name];
+                        const optionLabel = document.createElement('label');
+                        optionLabel.className = 'dropdown-option';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.value = email; // still send email
+                        optionLabel.appendChild(checkbox);
+                        optionLabel.appendChild(document.createTextNode(' ' + name)); // display name
+                        dropdown.appendChild(optionLabel);
+                      });
+                    } else {
+                      const disabledLabel = document.createElement('label');
+                      disabledLabel.className = 'dropdown-option disabled';
+                      disabledLabel.textContent = 'No contacts found.';
+                      dropdown.appendChild(disabledLabel);
+                    }
+                  });
+                }
                 // --- 2. RUN THE POPULATION CODE ONCE THE PAGE IS LOADED ---
                 window.addEventListener('DOMContentLoaded', () => {
                     populateAllDropdowns(emailListFromExtension);
@@ -1531,30 +1531,59 @@ Sent from VS Code Post-It Extension
                 });
 
                 document.body.addEventListener('change', (e) => {
-                    if (e.target.type === 'checkbox' && e.target.closest('.dropdown-options')) {
-                        const container = e.target.closest('.multiselect-container');
-        
-                        // 1. Get the note's ID from the container
-                        const noteId = container.dataset.noteId;
-        
-                        // 2. Find the placeholder by its unique ID, not its class
-                        const placeholder = document.getElementById(\`recipientPlaceholder-\${noteId}\`);
-                        
-                        // 3. Find the checkboxes
-                        const checkedInputs = container.querySelectorAll('input[type="checkbox"]:checked');
-                        
-                        // 4. This logic is now safe because 'placeholder' will always be found
-                        if (checkedInputs.length === 0) {
-                            placeholder.textContent = 'Select recipients...';
-                            placeholder.classList.add('placeholder-text');
-                        } else if (checkedInputs.length === 1) {
-                            placeholder.textContent = checkedInputs[0].value;
-                            placeholder.classList.remove('placeholder-text');
-                        } else {
-                            placeholder.textContent = \`\${checkedInputs.length} recipients selected\`;
-                            placeholder.classList.remove('placeholder-text');
-                        }
+                  if (e.target.type === 'checkbox' && e.target.closest('.dropdown-options')) {
+                    const container = e.target.closest('.multiselect-container');
+                    const noteId = container.dataset.noteId;
+                    const placeholder = document.getElementById(\`recipientPlaceholder-\${noteId}\`);
+                    const checkedInputs = container.querySelectorAll('input[type="checkbox"]:checked');
+                    const names = Array.from(checkedInputs).map(c => c.parentNode.textContent.trim());
+                    
+                    // Helper to measure text width
+                    function getTextWidth(text, font) {
+                      const canvas = document.createElement('canvas');
+                      const context = canvas.getContext('2d');
+                      context.font = font || getComputedStyle(placeholder).font;
+                      return context.measureText(text).width;
                     }
+
+                    if (names.length === 0) {
+                      placeholder.textContent = 'Select recipients...';
+                      placeholder.classList.add('placeholder-text');
+                      return;
+                    }
+
+                    placeholder.classList.remove('placeholder-text');
+                    const font = getComputedStyle(placeholder).font;
+                    const boxWidth = placeholder.closest('.select-box').clientWidth - 20;
+                    let displayText = '';
+
+                    if (names.length > 2) {
+                      displayText = names.slice(0, names.length - 1).join(', ') + ', and ' + names[names.length - 1];
+                    } else if (names.length === 2) {
+                      displayText = names.join(' and ');
+                    } else {
+                      displayText = names[0];
+                    }
+
+                    // If the text is too long, shorten it
+                    if (getTextWidth(displayText, font) > boxWidth) {
+                      let shownNames = [];
+                      for (let i = 0; i < names.length; i++) {
+                        const testText = shownNames.concat(names[i]).join(', ') + ', and ' + (names.length - i - 1) + ' others';
+                        if (getTextWidth(testText, font) > boxWidth) {
+                          displayText = shownNames.join(', ') + ', and ' + (names.length - i) + ' others';
+                          break;
+                        }
+                        shownNames.push(names[i]);
+                      }
+                    }
+
+                    if (displayText.charAt(0) === ',') {
+                      displayText = \`\${names.length} selected\`;
+                    }
+
+                    placeholder.textContent = displayText;
+                  }
                 });
 
                 // --- 3. MESSAGE LISTENER NO LONGER NEEDS 'loadEmails' ---

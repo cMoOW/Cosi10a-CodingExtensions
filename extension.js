@@ -55,13 +55,6 @@ function activate(context) {
 		// Status bar will be updated automatically by the callback
 	};
 
-	const disposable = vscode.commands.registerCommand('test.helloWorld', function () {
-		// The code you place here will be executed every time your command is executed
-
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello world has been run');
-	});
-
 	// View Notes Command
 	let viewNotesCommand = vscode.commands.registerCommand('test.viewNotes', async () => {
 		await updateStatusBar(); // Refresh notes before viewing
@@ -97,7 +90,10 @@ function activate(context) {
         const documentText = editor.document.getText();
 
         const emailUI = new EmailUIManager(context);
-        const emailList = ["brianshen@brandeis.edu", "auppal@brandeis.edu", "jacobcarminati@brandeis.edu", "siminglin@brandeis.edu"];
+        const emailList = {"Brian Shen": "brianshen@brandeis.edu", 
+                            "Apoorva Uppal": "auppal@brandeis.edu", 
+                            "Jacob Carminati": "jacobcarminati@brandeis.edu", 
+                            "SiMing Lin": "siminglin@brandeis.edu"};
         const storedEmail = context.globalState.get(EMAIL_KEY) || '';
 
         // Show the email editor window
@@ -136,7 +132,6 @@ function activate(context) {
 
  
 	// Register all commands
-	context.subscriptions.push(disposable);
 	context.subscriptions.push(viewNotesCommand);
 	context.subscriptions.push(addNoteCommand);
 	context.subscriptions.push(addNoteFromSelectionCommand);
