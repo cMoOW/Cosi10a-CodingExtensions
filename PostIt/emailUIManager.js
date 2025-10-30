@@ -31,9 +31,9 @@ class EmailUIManager {
         if (this.onSendCallback) {
           await this.onSendCallback(message.data);
         }
-        this.panel.dispose();
+        panel.dispose();
       } else if (message.type === "cancel") {
-        this.panel.dispose();
+        panel.dispose();
       }
     });
   }
