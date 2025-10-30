@@ -92,8 +92,15 @@
     "eslint": "^9.34.0"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@supabase/supabase-js": "^2.81.0",
     "dotenv": "^17.2.3",
     "nodemailer": "^7.0.6"
+=======
+    "dotenv": "^17.2.2",
+    "nodemailer": "^7.0.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+>>>>>>> f08ed2b (Setting up react for ticketing website)
   }
 }
