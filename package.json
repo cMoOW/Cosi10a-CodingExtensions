@@ -5,8 +5,13 @@
   "version": "0.0.1",
   "publisher": "Jacob, SiMing, Brian, Apoorva",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.104.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cMoOW/Cosi10a-CodingExtensions.git"
+  },
+  "license": "MIT",
   "categories": [
     "Other"
   ],
