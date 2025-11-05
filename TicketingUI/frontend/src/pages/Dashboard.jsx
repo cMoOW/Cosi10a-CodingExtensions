@@ -1,10 +1,23 @@
 import React from "react";
-import { BarChart2, PlusCircle, Ticket, Users } from "lucide-react";
+import { Ticket, BarChart2, Users } from "lucide-react";
 import { motion } from "framer-motion";
 
-export default function Dashboard({goToTickets}) {
+export default function Dashboard({ goToTickets, tickets }) {
+  // Compute stats dynamically
+  const totalTickets = tickets.length;
+  const openTickets = tickets.filter((t) => t.status === "Open").length;
+  const usersCount = [...new Set(tickets.map((t) => t.assignee))].length;
+
+  // Cards to display
+  const stats = [
+    { label: "Total Tickets", value: totalTickets, icon: Ticket },
+    { label: "Open Tickets", value: openTickets, icon: BarChart2 },
+    { label: "Users", value: usersCount, icon: Users },
+  ];
+
   return (
     <div style={{ padding: "24px", display: "grid", gap: "24px" }}>
+      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "bold" }}>Ticket Dashboard</h1>
         <button
@@ -19,29 +32,20 @@ export default function Dashboard({goToTickets}) {
             background: "white",
             cursor: "pointer",
           }}
-        ></button>
-        <button
-          style={{
-            borderRadius: "16px",
-            padding: "10px 16px",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            border: "1px solid #ccc",
-            background: "white",
-            cursor: "pointer",
-          }}
         >
-          <PlusCircle size={20} /> New Ticket
+          <Ticket size={20} /> View Tickets
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
-        {[
-          { label: "Total Tickets", value: 128, icon: Ticket },
-          { label: "Open Tickets", value: 45, icon: BarChart2 },
-          { label: "Users", value: 12, icon: Users },
-        ].map((item, index) => (
+      {/* Stats Cards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "16px",
+        }}
+      >
+        {stats.map((item, index) => (
           <motion.div
             key={item.label}
             initial={{ opacity: 0, y: 10 }}

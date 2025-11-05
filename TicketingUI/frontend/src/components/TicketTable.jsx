@@ -1,81 +1,140 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search } from "lucide-react";
+import { Clock, User, ArrowLeft } from "lucide-react";
 
-export default function TicketTable() {
-  const [search, setSearch] = useState("");
-  const [tickets] = useState([
-    { id: 1, title: "VSCode Sync Bug", status: "Open", priority: "High", assignedTo: "Apoorva" },
-    { id: 2, title: "Add API Auth", status: "In Progress", priority: "Medium", assignedTo: "John" },
-    { id: 3, title: "Login Page Fix", status: "Closed", priority: "Low", assignedTo: "Sarah" },
-  ]);
+export default function TicketsPage({ goToDashboard }) {
+  const [search, setSearch] = useState(""); // state for search input
 
-  const filteredTickets = tickets.filter((t) =>
-    t.title.toLowerCase().includes(search.toLowerCase())
+  const tickets = [
+    {
+      id: 1,
+      title: "Login not working",
+      description: "User unable to log in with correct credentials.",
+      status: "Open",
+      assignee: "Apoorva",
+    },
+    {
+      id: 2,
+      title: "Slow API response",
+      description: "Requests to /tickets take over 5 seconds.",
+      status: "In Progress",
+      assignee: "Apoorva",
+    },
+    {
+      id: 3,
+      title: "UI bug on mobile",
+      description: "Buttons overlap on small screens.",
+      status: "Resolved",
+      assignee: "Apoorva",
+    },
+    {
+      id: 4,
+      title: "Signup error",
+      description: "New users cannot register",
+      status: "Open",
+      assignee: "Random",
+    },
+  ];
+
+  // Filter tickets based on assignee search
+  const filteredTickets = tickets.filter((ticket) =>
+    ticket.assignee.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="p-6 space-y-6"
-    >
+    <div style={{ padding: "24px", display: "grid", gap: "24px" }}>
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Tickets</h1>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition">
-          <Plus size={18} /> New Ticket
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={{ fontSize: "28px", fontWeight: "bold" }}>Tickets</h1>
+        <button
+          onClick={goToDashboard}
+          style={{
+            borderRadius: "16px",
+            padding: "10px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            border: "1px solid #ccc",
+            background: "white",
+            cursor: "pointer",
+          }}
+        >
+          <ArrowLeft size={20} /> Back to Dashboard
         </button>
       </div>
 
-      {/* Search bar */}
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 max-w-md">
-        <Search size={18} />
-        <input
-          type="text"
-          placeholder="Search tickets..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full outline-none"
-        />
-      </div>
+      {/* Search Input */}
+      <input
+        type="text"
+        placeholder="Search by assignee..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{
+          padding: "10px 16px",
+          borderRadius: "12px",
+          border: "1px solid #ccc",
+          width: "250px",
+          fontSize: "14px",
+        }}
+      />
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-xl shadow bg-white">
-        <table className="min-w-full text-left border-collapse">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-3">ID</th>
-              <th className="p-3">Title</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Priority</th>
-              <th className="p-3">Assigned To</th>
-            </tr>
-          </thead>
+      {/* Tickets Cards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: "20px",
+        }}
+      >
+        {filteredTickets.length > 0 ? (
+          filteredTickets.map((ticket, index) => (
+            <motion.div
+              key={ticket.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              style={{
+                borderRadius: "16px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                background: "white",
+                padding: "20px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                minHeight: "150px",
+              }}
+            >
+              <div>
+                <h2 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "6px" }}>
+                  {ticket.title}
+                </h2>
+                <p style={{ color: "#666", fontSize: "14px", marginBottom: "12px" }}>
+                  {ticket.description}
+                </p>
+              </div>
 
-          <tbody>
-            {filteredTickets.map((ticket) => (
-              <tr
-                key={ticket.id}
-                className="border-t hover:bg-gray-50 transition"
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  color: "#555",
+                  fontSize: "14px",
+                }}
               >
-                <td className="p-3">{ticket.id}</td>
-                <td className="p-3">{ticket.title}</td>
-                <td className="p-3">{ticket.status}</td>
-                <td className="p-3">{ticket.priority}</td>
-                <td className="p-3">{ticket.assignedTo}</td>
-              </tr>
-            ))}
-            {filteredTickets.length === 0 && (
-              <tr>
-                <td colSpan="5" className="p-3 text-center text-gray-500">
-                  No tickets found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Clock size={16} /> {ticket.status}
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <User size={16} /> {ticket.assignee}
+                </span>
+              </div>
+            </motion.div>
+          ))
+        ) : (
+          <p>No tickets found for "{search}"</p>
+        )}
       </div>
-    </motion.div>
+    </div>
   );
 }
