@@ -1,9 +1,10 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
+const path = require('path');
 // Import the highlighter functionality from the new file
 //const { activateHighlighter } = require('./src/highlight.js');
-const { sendHelloEmail } = require('./src/send-email.js');
+const { createTicketFromEmailData } = require('./src/create-ticket.js');
 const { NoteManager } = require('./PostIt/noteManager');
 
 // This method is called when your extension is activated
@@ -74,10 +75,10 @@ function activate(context) {
 	});
 
 
-	async function sendEmailCommandHandler(highlightedText, documentText, noteManager) {
+	async function sendEmailCommandHandler(highlightedText, documentText, noteManager, editor) {
 		const panel = vscode.window.createWebviewPanel(
-			'emailPopup',
-			'Send Code Snippet via Email',
+			'ticketPopup',
+			'Create Support Ticket',
 			vscode.ViewColumn.Active,
 			{
 				enableScripts: true,
@@ -85,11 +86,11 @@ function activate(context) {
 			}
 		);
 	
-		panel.webview.html = getEmailFormHTML();
+		panel.webview.html = getTicketFormHTML();
 	
 		// Listen for messages from the webview
 		panel.webview.onDidReceiveMessage(async (message) => {
-			if (message.type === 'submitEmailForm') {
+			if (message.type === 'submitTicketForm') {
 				const { email, userMessage } = message.data;
 	
 				// Validate multiple emails
@@ -102,16 +103,32 @@ function activate(context) {
 				}
 	
 				try {
-					await sendHelloEmail(highlightedText, documentText, email, userMessage);
-					vscode.window.showInformationMessage('Email successfully sent!');
+					// Get file information from editor
+					const filePath = editor.document.uri.fsPath || editor.document.fileName;
+					const fileName = filePath ? path.basename(filePath) : null;
+					const language = editor.document.languageId || null;
+					
+					// Create ticket in Supabase
+					const ticket = await createTicketFromEmailData(
+						highlightedText,
+						documentText,
+						email,
+						userMessage,
+						filePath,
+						fileName,
+						language
+					);
+					
+					vscode.window.showInformationMessage(`Ticket #${ticket.id.substring(0, 8)} created successfully!`);
 					panel.dispose();
 	
 					// Optional: Add the message as a Post-It note
 					await noteManager.addNote(userMessage);
 					await updateStatusBar(); // Refresh and update status bar
-
+	
 				} catch (error) {
-					vscode.window.showErrorMessage('Failed to send email: ' + error.message);
+					console.error('Error creating ticket:', error);
+					vscode.window.showErrorMessage('Failed to create ticket: ' + error.message);
 				}
 			}
 		});
@@ -161,7 +178,7 @@ function activate(context) {
 		if (editor) {
 			const selection = editor.selection;
 			const selectedText = editor.document.getText(selection);
-			sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager);
+			sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager, editor);
 		}
 	});
  
@@ -191,14 +208,14 @@ function activate(context) {
 }
 
 
-function getEmailFormHTML() {
+function getTicketFormHTML() {
     return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Email Code Snippet</title>
+        <title>Create Support Ticket</title>
         <style>
             body {
                 font-family: 'Segoe UI', Tahoma, sans-serif;
@@ -252,28 +269,28 @@ function getEmailFormHTML() {
         </style>
     </head>
     <body>
-        <h2>Send Your Code Snippet</h2>
-        <form id="emailForm">
+        <h2>Create Support Ticket</h2>
+        <form id="ticketForm">
             <div>
-                <label for="email">Brandeis Email(s):</label>
-                <input type="text" id="email" placeholder="name@brandeis.edu, name1@brandeis.edu, ... required />
-                <small style="color: #888; font-size: 12px;">Separate multiple emails with commas</small>
+                <label for="email">Your Brandeis Email:</label>
+                <input type="text" id="email" placeholder="name@brandeis.edu" required />
+                <small style="color: #888; font-size: 12px;">Your email will be used to track this ticket</small>
             </div>
             <div>
-                <label for="message">Message:</label>
-                <textarea id="message" rows="4" placeholder="Enter your message..." required></textarea>
+                <label for="message">Describe your issue:</label>
+                <textarea id="message" rows="4" placeholder="Enter your question or describe the problem..." required></textarea>
             </div>
-            <button type="submit">Send Email</button>
+            <button type="submit">Create Ticket</button>
         </form>
 
         <script>
             const vscode = acquireVsCodeApi();
-            document.getElementById('emailForm').addEventListener('submit', (e) => {
+            document.getElementById('ticketForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 const email = document.getElementById('email').value.trim();
                 const userMessage = document.getElementById('message').value.trim();
                 vscode.postMessage({
-                    type: 'submitEmailForm',
+                    type: 'submitTicketForm',
                     data: { email, userMessage }
                 });
             });
