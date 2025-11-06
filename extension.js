@@ -1,9 +1,10 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
+const path = require('path');
 // Import the highlighter functionality from the new file
 //const { activateHighlighter } = require('./src/highlight.js');
-const { sendEmail } = require('./src/send-email.js');
+const { createTicketFromEmailData } = require('./src/create-ticket.js');
 const { NoteManager } = require('./PostIt/noteManager');
 
 const EMAIL_KEY = 'myExtension.userEmail';
@@ -88,10 +89,10 @@ function activate(context) {
 	});
 
 
-	async function sendEmailCommandHandler(highlightedText, documentText, noteManager) {
+	async function sendEmailCommandHandler(highlightedText, documentText, noteManager, editor) {
 		const panel = vscode.window.createWebviewPanel(
-			'emailPopup',
-			'Send Code Snippet via Email',
+			'ticketPopup',
+			'Create Support Ticket',
 			vscode.ViewColumn.Active,
 			{
 				enableScripts: true,
@@ -99,20 +100,13 @@ function activate(context) {
 			}
 		);
 	
-		panel.webview.html = getEmailFormHTML(context);
-		// In your extension.ts/js file, after creating the webview panel
-		const emailList = ["brianshen@brandeis.edu", "auppal@brandeis.edu", "jacobcarminati@brandeis.edu", "siminglin@brandeis.edu"];
-
-		panel.webview.postMessage({
-    		type: 'loadEmails',
-    		emails: emailList
-		});
+		panel.webview.html = getTicketFormHTML();
 	
 		// Listen for messages from the webview
 		panel.webview.onDidReceiveMessage(async (message) => {
-			if (message.type === 'submitEmailForm') {
-				const { userEmail, recipientEmail, userMessage } = message.data;
-
+			if (message.type === 'submitTicketForm') {
+				const { email, userMessage } = message.data;
+	
 				// Validate multiple emails
 				const emails = recipientEmail.split(',').map(e => e.trim());
 				const invalidEmails = emails.filter(e => !e.endsWith('@brandeis.edu'));
@@ -128,19 +122,32 @@ function activate(context) {
 				}
 	
 				try {
-                    // Store the user's email for future use
-                    context.globalState.update(EMAIL_KEY, userEmail);
-                    // Call the email service with all the user's input
-                    await sendEmail(highlightedText, documentText, userEmail,recipientEmail, userMessage);
-					vscode.window.showInformationMessage('Email successfully sent!');
+					// Get file information from editor
+					const filePath = editor.document.uri.fsPath || editor.document.fileName;
+					const fileName = filePath ? path.basename(filePath) : null;
+					const language = editor.document.languageId || null;
+					
+					// Create ticket in Supabase
+					const ticket = await createTicketFromEmailData(
+						highlightedText,
+						documentText,
+						email,
+						userMessage,
+						filePath,
+						fileName,
+						language
+					);
+					
+					vscode.window.showInformationMessage(`Ticket #${ticket.id.substring(0, 8)} created successfully!`);
 					panel.dispose();
 	
 					// Optional: Add the message as a Post-It note
 					await noteManager.addNote(userMessage);
 					await updateStatusBar(); // Refresh and update status bar
-
+	
 				} catch (error) {
-					vscode.window.showErrorMessage('Failed to send email: ' + error.message);
+					console.error('Error creating ticket:', error);
+					vscode.window.showErrorMessage('Failed to create ticket: ' + error.message);
 				}
 			}
 		});
@@ -190,7 +197,7 @@ function activate(context) {
 		if (editor) {
 			const selection = editor.selection;
 			const selectedText = editor.document.getText(selection);
-			sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager);
+			sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager, editor);
 		}
 	});
  
@@ -220,261 +227,91 @@ function activate(context) {
 }
 
 
-function getEmailFormHTML(context) {
-    // Retrieve stored user email if available
-    const storedEmail = context.globalState.get(EMAIL_KEY);
-    if (storedEmail) {
-        console.log('Retrieved stored email:', storedEmail);
-    }
+function getTicketFormHTML() {
     return `
     <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Code Snippet</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, sans-serif;
-            padding: 20px;
-            background: #1e1e1e;
-            color: #fff;
-        }
-        h2 {
-            text-align: center;
-            color: #fff;
-            margin-bottom: 20px;
-        }
-        form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            background: #2c2c2c;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
-        label {
-            font-weight: 500;
-        }
-        /* Base styles for inputs */
-        input[type="email"], 
-        textarea {
-            width: 100%;
-            padding: 10px;
-            border-radius: 4px;
-            border: none;
-            font-size: 14px;
-            background: #3a3a3a;
-            color: white;
-            outline: none;
-            box-sizing: border-box; 
-        }
-        input[type="email"]:focus, 
-        textarea:focus {
-            border: 1px solid #74B9FF;
-        }
-
-        /* --- NEW CSS for Custom Dropdown --- */
-
-        .multiselect-container {
-            position: relative; /* Allows dropdown to be positioned below */
-        }
-
-        /* This is the box that looks like an input */
-        .select-box {
-            width: 100%;
-            padding: 10px;
-            border-radius: 4px;
-            background: #3a3a3a;
-            color: white;
-            font-size: 14px;
-            cursor: pointer;
-            box-sizing: border-box;
-            user-select: none; /* Prevents text selection on click */
-        }
-        .select-box:focus {
-            border: 1px solid #74B9FF;
-        }
-        .select-box .placeholder {
-            color: #888;
-        }
-
-        /* This is the dropdown panel that hides/shows */
-        .dropdown-options {
-            display: none; /* Hidden by default */
-            position: absolute;
-            top: 100%; /* Position right below the select box */
-            left: 0;
-            width: 100%;
-            background: #3a3a3a;
-            border: 1px solid #74B9FF;
-            border-top: none;
-            border-radius: 0 0 4px 4px;
-            max-height: 150px;
-            overflow-y: auto;
-            z-index: 10;
-        }
-        .dropdown-options.show {
-            display: block; /* Show the dropdown */
-        }
-        
-        /* Individual checkbox options */
-        .dropdown-option {
-            display: block;
-            padding: 10px;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .dropdown-option:hover {
-            background: #5aa0e6;
-        }
-        .dropdown-option input[type="checkbox"] {
-            margin-right: 10px;
-        }
-        .dropdown-option.disabled {
-            color: #888;
-            cursor: default;
-            background: none;
-        }
-
-        /* --- End Custom Dropdown CSS --- */
-
-        button {
-            background: #74B9FF;
-            color: #1e1e1e;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.2s ease;
-        }
-        button:hover {
-            background: #5aa0e6;
-        }
-    </style>
-</head>
-<body>
-    <h2>Send Your Code Snippet</h2>
-    <form id="emailForm">
-        <div>
-            <label for="userEmail">Your Email:</label>
-            <input type="email" id="userEmail" value="${storedEmail || ''}" placeholder="your-email@brandeis.edu" required />
-        </div>
-        
-        <div>
-            <label for="recipientSelectBox">Recipient Email(s):</label>
-            <div class="multiselect-container">
-                <div class="select-box" id="recipientSelectBox" tabindex="0">
-                    <span class="placeholder" id="recipientPlaceholder">Select recipients...</span>
-                </div>
-                <div id="recipientDropdown" class="dropdown-options">
-                    <label class="dropdown-option disabled">
-                        Loading emails...
-                    </label>
-                </div>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Create Support Ticket</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, sans-serif;
+                padding: 20px;
+                background: #1e1e1e;
+                color: #fff;
+            }
+            h2 {
+                text-align: center;
+                color: #fff;
+                margin-bottom: 20px;
+            }
+            form {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                background: #2c2c2c;
+                border-radius: 8px;
+                padding: 20px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            }
+            label {
+                font-weight: 500;
+            }
+            input, textarea {
+                width: 100%;
+                padding: 10px;
+                border-radius: 4px;
+                border: none;
+                font-size: 14px;
+                background: #3a3a3a;
+                color: white;
+                outline: none;
+            }
+            input:focus, textarea:focus {
+                border: 1px solid #74B9FF;
+            }
+            button {
+                background: #74B9FF;
+                color: #1e1e1e;
+                padding: 10px 15px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: bold;
+                transition: 0.2s ease;
+            }
+            button:hover {
+                background: #5aa0e6;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Create Support Ticket</h2>
+        <form id="ticketForm">
+            <div>
+                <label for="email">Your Brandeis Email:</label>
+                <input type="text" id="email" placeholder="name@brandeis.edu" required />
+                <small style="color: #888; font-size: 12px;">Your email will be used to track this ticket</small>
             </div>
-        </div>
-        <div>
-            <label for="message">Message:</label>
-            <textarea id="message" rows="4" placeholder="Enter your message..." required></textarea>
-        </div>
-        <button type="submit">Send Email</button>
-    </form>
+            <div>
+                <label for="message">Describe your issue:</label>
+                <textarea id="message" rows="4" placeholder="Enter your question or describe the problem..." required></textarea>
+            </div>
+            <button type="submit">Create Ticket</button>
+        </form>
 
-    <script>
-        const vscode = acquireVsCodeApi();
-
-        const selectBox = document.getElementById('recipientSelectBox');
-        const dropdown = document.getElementById('recipientDropdown');
-        const placeholder = document.getElementById('recipientPlaceholder');
-
-        // --- NEW: Toggle dropdown visibility ---
-        selectBox.addEventListener('click', () => {
-            dropdown.classList.toggle('show');
-        });
-
-        // --- NEW: Close dropdown when clicking outside ---
-        window.addEventListener('click', (e) => {
-            if (!selectBox.contains(e.target)) {
-                dropdown.classList.remove('show');
-            }
-        });
-
-        // --- NEW: Update placeholder text when checkboxes change ---
-        dropdown.addEventListener('change', () => {
-            const checkedInputs = dropdown.querySelectorAll('input[type="checkbox"]:checked');
-            if (checkedInputs.length === 0) {
-                placeholder.textContent = 'Select recipients...';
-                placeholder.classList.add('placeholder');
-            } else if (checkedInputs.length === 1) {
-                placeholder.textContent = checkedInputs[0].value;
-                placeholder.classList.remove('placeholder');
-            } else {
-                placeholder.textContent = checkedInputs.length + ' recipients selected';
-                placeholder.classList.remove('placeholder');
-            }
-        });
-
-        // --- MODIFIED: Listen for emails from the extension ---
-        window.addEventListener('message', event => {
-            const message = event.data;
-            if (message.type === 'loadEmails' && Array.isArray(message.emails)) {
-                
-                // Clear "Loading..." message
-                dropdown.innerHTML = ''; 
-
-                // Populate with checkbox options
-                if (message.emails.length > 0) {
-                    message.emails.forEach(email => {
-                        const optionLabel = document.createElement('label');
-                        optionLabel.className = 'dropdown-option';
-                        
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.value = email;
-                        
-                        optionLabel.appendChild(checkbox);
-                        optionLabel.appendChild(document.createTextNode(' ' + email));
-                        dropdown.appendChild(optionLabel);
-                    });
-                } else {
-                    // Show disabled message if no emails are loaded
-                    const disabledLabel = document.createElement('label');
-                    disabledLabel.className = 'dropdown-option disabled';
-                    disabledLabel.textContent = 'No emails found.';
-                    dropdown.appendChild(disabledLabel);
-                }
-            }
-        });
-
-        // --- MODIFIED: Listen for the form submit button ---
-        document.getElementById('emailForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            
-            const userEmail = document.getElementById('userEmail').value.trim();
-            const message = document.getElementById('message').value.trim();
-
-            // --- NEW: Get emails from checked boxes ---
-            const checkedInputs = dropdown.querySelectorAll('input[type="checkbox"]:checked');
-            const selectedEmails = Array.from(checkedInputs).map(input => input.value);
-            
-            // Simple validation since "required" doesn't work on custom elements
-            if (selectedEmails.length === 0) {
-                alert('Please select at least one recipient.');
-                // Focus the box for accessibility
-                selectBox.focus();
-                return; 
-            }
-            
-            const recipientEmail = selectedEmails.join(', ');
-            
-            // Post all three values back to the extension
-            vscode.postMessage({
-                type: 'submitEmailForm',
-                data: { userEmail, recipientEmail, message }
+        <script>
+            const vscode = acquireVsCodeApi();
+            document.getElementById('ticketForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email').value.trim();
+                const userMessage = document.getElementById('message').value.trim();
+                vscode.postMessage({
+                    type: 'submitTicketForm',
+                    data: { email, userMessage }
+                });
             });
         });
     </script>
