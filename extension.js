@@ -5,6 +5,8 @@ const vscode = require('vscode');
 //const { activateHighlighter } = require('./src/highlight.js');
 const { sendEmail } = require('./src/send-email.js');
 const { NoteManager } = require('./PostIt/noteManager');
+const path = require('path');
+const {spawn} = require('child_process');
 
 const EMAIL_KEY = 'myExtension.userEmail';
 
@@ -217,7 +219,92 @@ function activate(context) {
 
 	// highlight TODO: Uncomment this line to enable the highlighter functionality
 	// activateHighlighter(context);
+    // Register the 'visualizer.start' command
+    let visualizer = vscode.commands.registerCommand('visualizer.start', async () => {
+        
+        // 1. Get the active Python file
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.document.languageId !== 'python') {
+            vscode.window.showErrorMessage('Please open a Python file to visualize.');
+            return;
+        }
+
+        const scriptPath = editor.document.fileName;
+        const scriptDir = path.dirname(scriptPath); // <-- NEW: Get the script's directory
+        const sourceCode = editor.document.getText();
+
+        // 2. Find our tracer.py script
+        // It's in the root of our extension, right next to extension.js
+        const tracerPath = path.join(context.extensionPath, 'src/tracer.py');
+
+        // 3. Find the Python interpreter
+        // Note: 'python3' is a guess. A real extension would ask the user
+        // or use the Python Extension's API to find the right path.
+        const pythonCommand = 'python3'; 
+
+        // 4. Run the tracer.py script as a child process
+        vscode.window.showInformationMessage('Visualizer running...');
+        
+       // 2. This 'await' is why the function above needs to be 'async'
+        const userInput = await vscode.window.showInputBox({
+            prompt: "Enter all inputs, separated by newlines (\\n)",
+            placeHolder: "e.g., John\\n42\\nblue"
+        });
+
+        const allInputs = userInput || ""; 
+        
+        // 3. ... (rest of your spawn code)
+        const tracerProcess = spawn(
+            pythonCommand, 
+            [tracerPath, scriptPath, allInputs],
+            { cwd: scriptDir }
+        );
+
+        let traceDataJson = '';
+        let errorData = '';
+
+        // 5. Collect data from the tracer's stdout
+        tracerProcess.stdout.on('data', (data) => {
+            traceDataJson += data.toString();
+        });
+
+        // Collect any errors
+        tracerProcess.stderr.on('data', (data) => {
+            errorData += data.toString();
+        });
+
+        // 6. When the process finishes, create the webview
+        tracerProcess.on('close', (code) => {
+            // --- ADD THIS LOGGING ---
+            // This will help us see the real error
+            console.log('--- VISUALIZER DEBUG ---');
+            console.log('Tracer process exited with code:', code);
+            console.log('--- STDOUT (Trace Data) ---');
+            console.log(traceDataJson);
+            console.log('--- STDERR (Error Data) ---');
+            console.log(errorData);
+            console.log('--------------------------');
+            // --- END LOGGING ---
+            if (code !== 0) {
+                // If the tracer script itself failed
+                vscode.window.showErrorMessage(`Tracer failed to run: ${errorData}`);
+                return;
+            }
+
+            if (traceDataJson.length === 0) {
+                vscode.window.showErrorMessage('Tracer returned no data.');
+                return;
+            }
+            
+            // 7. Success! Create the panel.
+            createVisualizerPanel(context, sourceCode, traceDataJson);
+        });
+    });
+
+    context.subscriptions.push(visualizer);
+
 }
+
 
 
 function getEmailFormHTML(context) {
@@ -497,6 +584,217 @@ function getUserEmail(context) {
 
 }
 
+/**
+ * Creates and shows a new Webview panel with the visualizer UI.
+ */
+function createVisualizerPanel(context, sourceCode, traceData) {
+    const panel = vscode.window.createWebviewPanel(
+        'pythonVisualizer',     // Internal ID
+        'Python Visualizer',    // Title in the tab
+        vscode.ViewColumn.Beside, // Show in a new column
+        {
+            enableScripts: true // Allow JavaScript to run
+        }
+    );
+
+    // Set the HTML content for the Webview
+    panel.webview.html = getWebviewContent(sourceCode, traceData);
+}
+
+/**
+ * Generates the full HTML/CSS/JS for the Webview.
+ * This is the "player" UI.
+ */
+function getWebviewContent(sourceCode, traceData) {
+    
+    // Safely embed the source code and trace data into the HTML
+    const safeSourceCode = JSON.stringify(sourceCode);
+    
+    return `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Python Visualizer</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; }
+                
+                /* NEW: Use Flexbox for controls */
+                #controls { 
+                    padding: 10px; 
+                    border-bottom: 1px solid #333; 
+                    display: flex; 
+                    align-items: center; /* Vertically center items */
+                }
+                #stepLabel { 
+                    margin: 0 10px; 
+                    display: inline-block; 
+                    min-width: 100px; /* Give it space */
+                    text-align: right; /* Align text to the right */
+                }
+                button { background-color: #007acc; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+                button:disabled { background-color: #555; }
+                
+                /* NEW: Style for the slider */
+                #stepSlider {
+                    flex-grow: 1; /* Make the slider fill the available space */
+                    margin: 0 10px;
+                }
+                
+                #main { display: flex; flex: 1; overflow: hidden; }
+                
+                #codeDisplay {
+                    font-family: "Consolas", "Courier New", monospace;
+                    padding: 15px;
+                    white-space: pre;
+                    overflow-y: auto;
+                    width: 60%;
+                    border-right: 1px solid #333;
+                }
+                
+                #sidebar {
+                    width: 40%;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+
+                #varsDisplay, #outputDisplay {
+                    font-family: "Consolas", "Courier New", monospace;
+                    padding: 15px;
+                    overflow-y: auto;
+                }
+                
+                #varsDisplay {
+                    flex-shrink: 1;
+                    min-height: 100px;
+                    border-bottom: 1px solid #333;
+                }
+                
+                #outputDisplay { flex-grow: 1; }
+                #outputDisplay h4 { margin-top: 0; }
+                #outputContent { white-space: pre-wrap; }
+                .highlight-line { background-color: rgba(255, 255, 0, 0.3); }
+            </style>
+        </head>
+        <body>
+            <div id="controls">
+                <button id="prevBtn">« Prev</button>
+                <input type="range" id="stepSlider" value="0" min="0" max="0" />
+                <button id="nextBtn">Next »</button>
+                <span id="stepLabel">Step: 0 / 0</span>
+            </div>
+            
+            <div id="main">
+                <div id="codeDisplay"></div>
+                
+                <div id="sidebar">
+                    <div id="varsDisplay"></div>
+                    <div id="outputDisplay">
+                        <h4>Program Output</h4>
+                        <pre id="outputContent"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                // --- Data Injected from Extension ---
+                const sourceCode = ${safeSourceCode};
+                const trace = ${traceData};
+                // --- End of Injected Data ---
+
+                // --- Client-Side JS for the Player ---
+                let currentIndex = -1;
+                const codeLines = sourceCode.split('\\n');
+
+                const prevBtn = document.getElementById('prevBtn');
+                const nextBtn = document.getElementById('nextBtn');
+                const stepLabel = document.getElementById('stepLabel');
+                const codeDisplay = document.getElementById('codeDisplay');
+                const varsDisplay = document.getElementById('varsDisplay');
+                const outputContent = document.getElementById('outputContent');
+                const stepSlider = document.getElementById('stepSlider'); // NEW: Get slider
+
+                // Function to render the current step
+                function render() {
+                    // 1. Update Buttons & Label
+                    prevBtn.disabled = (currentIndex <= 0);
+                    nextBtn.disabled = (currentIndex >= trace.length - 1);
+                    stepLabel.textContent = \`Step: \${currentIndex + 1} / \${trace.length}\`;
+                    
+                    // NEW: Update the slider's position
+                    if (stepSlider) {
+                        stepSlider.value = currentIndex;
+                    }
+
+                    if (currentIndex < 0 || currentIndex >= trace.length) return;
+                    
+                    const step = trace[currentIndex];
+                    const currentLine = step.line_no;
+
+                    // 2. Render Code + Highlight
+                    let codeHtml = '';
+                    for (let i = 0; i < codeLines.length; i++) {
+                        const lineClass = (i + 1 === currentLine) ? 'highlight-line' : '';
+                        const lineText = codeLines[i].replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        codeHtml += \`<div class="\${lineClass}">\${lineText || '&nbsp;'}</div>\`;
+                    }
+                    codeDisplay.innerHTML = codeHtml;
+
+                    // 3. Render Variables
+                    let varsHtml = '<h4>Local Variables</h4>';
+                    varsHtml += JSON.stringify(step.local_vars, null, 2);
+                    varsDisplay.innerHTML = varsHtml;
+                    
+                    // 4. Render Cumulative Output
+                    let cumulativeOutput = '';
+                    for (let i = 0; i <= currentIndex; i++) {
+                        if (trace[i].output) {
+                            cumulativeOutput += trace[i].output;
+                        }
+                    }
+                    outputContent.textContent = cumulativeOutput;
+                }
+                
+                // --- Event Listeners ---
+                prevBtn.onclick = () => {
+                    if (currentIndex > 0) {
+                        currentIndex--;
+                        render();
+                    }
+                };
+                
+                nextBtn.onclick = () => {
+                    if (currentIndex < trace.length - 1) {
+                        currentIndex++;
+                        render();
+                    }
+                };
+                
+                // NEW: Add event listener for the slider
+                // 'oninput' fires immediately as you drag
+                stepSlider.oninput = () => {
+                    currentIndex = parseInt(stepSlider.value, 10);
+                    render();
+                };
+
+                // Initial render (start at step 0)
+                if (trace.length > 0) {
+                    // NEW: Set the slider's max value
+                    stepSlider.max = trace.length - 1;
+                    
+                    currentIndex = 0;
+                    render();
+                } else {
+                    stepLabel.textContent = "No steps recorded.";
+                }
+
+            </script>
+        </body>
+        </html>
+    `;
+}
 
 // This method is called when your extension is deactivated
 function deactivate() {}
