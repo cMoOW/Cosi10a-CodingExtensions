@@ -219,8 +219,11 @@ function activate(context) {
 
 	// highlight TODO: Uncomment this line to enable the highlighter functionality
 	// activateHighlighter(context);
-    // Register the 'visualizer.start' command
-    let visualizer = vscode.commands.registerCommand('visualizer.start', async () => {
+   
+    // Store the panel globally so we only have one
+    let panel = undefined;
+
+    let visualizer = vscode.commands.registerCommand('visualizer.start', () => {
         
         // 1. Get the active Python file
         const editor = vscode.window.activeTextEditor;
@@ -229,82 +232,105 @@ function activate(context) {
             return;
         }
 
-        const scriptPath = editor.document.fileName;
-        const scriptDir = path.dirname(scriptPath); // <-- NEW: Get the script's directory
-        const sourceCode = editor.document.getText();
+        // If the panel already exists, just show it.
+        if (panel) {
+            panel.reveal(vscode.ViewColumn.Beside);
+            return;
+        }
 
-        // 2. Find our tracer.py script
-        // It's in the root of our extension, right next to extension.js
-        const tracerPath = path.join(context.extensionPath, 'src/tracer.py');
-
-        // 3. Find the Python interpreter
-        // Note: 'python3' is a guess. A real extension would ask the user
-        // or use the Python Extension's API to find the right path.
-        const pythonCommand = 'python3'; 
-
-        // 4. Run the tracer.py script as a child process
-        vscode.window.showInformationMessage('Visualizer running...');
-        
-       // 2. This 'await' is why the function above needs to be 'async'
-        const userInput = await vscode.window.showInputBox({
-            prompt: "Enter all inputs, separated by newlines (\\n)",
-            placeHolder: "e.g., John\\n42\\nblue"
-        });
-
-        const allInputs = userInput || ""; 
-        
-        // 3. ... (rest of your spawn code)
-        const tracerProcess = spawn(
-            pythonCommand, 
-            [tracerPath, scriptPath, allInputs],
-            { cwd: scriptDir }
+        // 2. Create the Webview Panel (runs only ONCE)
+        panel = vscode.window.createWebviewPanel(
+            'pythonVisualizer',     // Internal ID
+            'Python Visualizer',    // Title
+            vscode.ViewColumn.Beside, // Show in a new column
+            {
+                enableScripts: true, // Allow JavaScript to run
+                // Retain state even when panel is not visible
+                retainContextWhenHidden: true 
+            }
         );
 
-        let traceDataJson = '';
-        let errorData = '';
+        // 3. Set up a listener for messages from the Webview
+        panel.webview.onDidReceiveMessage(
+            message => {
+                if (message.command === 'rerun') {
+                    // User clicked 'Re-run', so we run the tracer again
+                    // with the new input from the webview.
+                    runTracerAndRefresh(editor, context, panel, message.text);
+                }
+            },
+            undefined,
+            context.subscriptions
+        );
 
-        // 5. Collect data from the tracer's stdout
-        tracerProcess.stdout.on('data', (data) => {
-            traceDataJson += data.toString();
-        });
+        // 4. Set a listener for when the panel is closed
+        panel.onDidDispose(() => {
+            panel = undefined; // Clear the panel so we can create a new one
+        },
+        undefined,
+        context.subscriptions
+        );
 
-        // Collect any errors
-        tracerProcess.stderr.on('data', (data) => {
-            errorData += data.toString();
-        });
-
-        // 6. When the process finishes, create the webview
-        tracerProcess.on('close', (code) => {
-            // --- ADD THIS LOGGING ---
-            // This will help us see the real error
-            console.log('--- VISUALIZER DEBUG ---');
-            console.log('Tracer process exited with code:', code);
-            console.log('--- STDOUT (Trace Data) ---');
-            console.log(traceDataJson);
-            console.log('--- STDERR (Error Data) ---');
-            console.log(errorData);
-            console.log('--------------------------');
-            // --- END LOGGING ---
-            if (code !== 0) {
-                // If the tracer script itself failed
-                vscode.window.showErrorMessage(`Tracer failed to run: ${errorData}`);
-                return;
-            }
-
-            if (traceDataJson.length === 0) {
-                vscode.window.showErrorMessage('Tracer returned no data.');
-                return;
-            }
-            
-            // 7. Success! Create the panel.
-            createVisualizerPanel(context, sourceCode, traceDataJson);
-        });
+        // 5. Run the visualizer for the FIRST time with empty input
+        runTracerAndRefresh(editor, context, panel, "");
     });
 
     context.subscriptions.push(visualizer);
 
 }
 
+
+/**
+ * This is our new main function. It runs the tracer and updates the panel.
+ * @param {vscode.TextEditor} editor
+ * @param {vscode.ExtensionContext} context
+ * @param {vscode.WebviewPanel} panel
+ * @param {string} allInputs - The input string from the user.
+ */
+function runTracerAndRefresh(editor, context, panel, allInputs) {
+
+    const scriptPath = editor.document.fileName;
+    const scriptDir = path.dirname(scriptPath);
+    const sourceCode = editor.document.getText();
+    const tracerPath = path.join(context.extensionPath, 'src/tracer.py');
+    const pythonCommand = 'python3'; // Or 'python'
+
+    // Set the panel's HTML to a "Loading..." message
+    panel.webview.html = "<h1>Running tracer...</h1>";
+
+    // Run the tracer (this is the same logic as before)
+    const tracerProcess = spawn(
+        pythonCommand,
+        [tracerPath, scriptPath, allInputs],
+        { cwd: scriptDir }
+    );
+
+    let traceDataJson = '';
+    let errorData = '';
+
+    tracerProcess.stdout.on('data', (data) => {
+        traceDataJson += data.toString();
+    });
+
+    tracerProcess.stderr.on('data', (data) => {
+        errorData += data.toString();
+    });
+
+    // When the tracer finishes...
+    tracerProcess.on('close', (code) => {
+        if (code !== 0) {
+            // --- THIS IS THE CHANGE ---
+            // It failed, so we render the full UI but pass in
+            // an empty trace ("[]") and the error message.
+            panel.webview.html = getWebviewContent(sourceCode, "[]", allInputs, errorData);
+            return;
+        }
+
+        // If it succeeded, update the webview HTML with the new data
+        // We pass 'null' for the errorData.
+        panel.webview.html = getWebviewContent(sourceCode, traceDataJson, allInputs, null);
+    });
+}
 
 
 function getEmailFormHTML(context) {
@@ -584,31 +610,19 @@ function getUserEmail(context) {
 
 }
 
-/**
- * Creates and shows a new Webview panel with the visualizer UI.
- */
-function createVisualizerPanel(context, sourceCode, traceData) {
-    const panel = vscode.window.createWebviewPanel(
-        'pythonVisualizer',     // Internal ID
-        'Python Visualizer',    // Title in the tab
-        vscode.ViewColumn.Beside, // Show in a new column
-        {
-            enableScripts: true // Allow JavaScript to run
-        }
-    );
-
-    // Set the HTML content for the Webview
-    panel.webview.html = getWebviewContent(sourceCode, traceData);
-}
 
 /**
  * Generates the full HTML/CSS/JS for the Webview.
- * This is the "player" UI.
+ * @param {string} sourceCode - The Python source code.
+ * @param {string} traceData - The JSON string of the execution trace.
+ * @param {string} currentInputs - The input string that was used for this run.
+ * @param {string | null} errorData - The error message, if any.
  */
-function getWebviewContent(sourceCode, traceData) {
+function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
     
-    // Safely embed the source code and trace data into the HTML
+    // Safely embed all the data into the HTML
     const safeSourceCode = JSON.stringify(sourceCode);
+    const safeErrorData = JSON.stringify(errorData || null);
     
     return `
         <!DOCTYPE html>
@@ -618,32 +632,77 @@ function getWebviewContent(sourceCode, traceData) {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Python Visualizer</title>
             <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; }
-                
-                /* NEW: Use Flexbox for controls */
+                body { 
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+                    display: flex; 
+                    flex-direction: column; 
+                    height: 100vh; 
+                    margin: 0; 
+                }
+
+                /* --- Error Display --- */
+                #errorDisplay {
+                    padding: 10px;
+                    background-color: #5c2121; /* Dark red background */
+                    border-bottom: 1px solid #333;
+                }
+                #errorDisplay h4 {
+                    margin: 0 0 5px 0;
+                    color: #ffcccc; /* Light red text */
+                }
+                #errorDisplay pre {
+                    white-space: pre-wrap;
+                    color: white;
+                    margin: 0;
+                }
+
+                /* --- Input Area --- */
+                #inputArea {
+                    padding: 10px;
+                    border-bottom: 1px solid #333;
+                }
+                #inputArea h4 { margin: 0 0 5px 0; }
+                #inputBox {
+                    width: calc(100% - 10px);
+                    font-family: "Consolas", "Courier New", monospace;
+                }
+                #rerunBtn {
+                    margin-top: 5px;
+                    background-color: #098309; /* Green for re-run */
+                }
+
+                /* --- Controls --- */
                 #controls { 
                     padding: 10px; 
                     border-bottom: 1px solid #333; 
                     display: flex; 
-                    align-items: center; /* Vertically center items */
+                    align-items: center; 
                 }
                 #stepLabel { 
                     margin: 0 10px; 
-                    display: inline-block; 
-                    min-width: 100px; /* Give it space */
-                    text-align: right; /* Align text to the right */
+                    min-width: 100px; 
+                    text-align: right; 
                 }
-                button { background-color: #007acc; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+                button { 
+                    background-color: #007acc; 
+                    color: white; 
+                    border: none; 
+                    padding: 5px 10px; 
+                    border-radius: 3px; 
+                    cursor: pointer; 
+                }
                 button:disabled { background-color: #555; }
-                
-                /* NEW: Style for the slider */
-                #stepSlider {
-                    flex-grow: 1; /* Make the slider fill the available space */
-                    margin: 0 10px;
+                #stepSlider { 
+                    flex-grow: 1; 
+                    margin: 0 10px; 
                 }
-                
-                #main { display: flex; flex: 1; overflow: hidden; }
-                
+
+                /* --- Main Layout --- */
+                #main { 
+                    display: flex; 
+                    flex: 1; 
+                    overflow: hidden; 
+                }
                 #codeDisplay {
                     font-family: "Consolas", "Courier New", monospace;
                     padding: 15px;
@@ -652,7 +711,6 @@ function getWebviewContent(sourceCode, traceData) {
                     width: 60%;
                     border-right: 1px solid #333;
                 }
-                
                 #sidebar {
                     width: 40%;
                     display: flex;
@@ -660,25 +718,35 @@ function getWebviewContent(sourceCode, traceData) {
                     overflow: hidden;
                 }
 
+                /* --- Sidebar Panes --- */
                 #varsDisplay, #outputDisplay {
                     font-family: "Consolas", "Courier New", monospace;
                     padding: 15px;
                     overflow-y: auto;
                 }
-                
                 #varsDisplay {
                     flex-shrink: 1;
                     min-height: 100px;
                     border-bottom: 1px solid #333;
                 }
-                
                 #outputDisplay { flex-grow: 1; }
                 #outputDisplay h4 { margin-top: 0; }
                 #outputContent { white-space: pre-wrap; }
-                .highlight-line { background-color: rgba(255, 255, 0, 0.3); }
+                
+                .highlight-line { 
+                    background-color: rgba(255, 255, 0, 0.3); 
+                }
             </style>
         </head>
         <body>
+            <div id="errorDisplay"></div>
+
+            <div id="inputArea">
+                <h4>Program Input (one per line)</h4>
+                <textarea id="inputBox" rows="3">${currentInputs.replace(/\\n/g, '\n')}</textarea>
+                <button id="rerunBtn">Re-run Visualization</button>
+            </div>
+            
             <div id="controls">
                 <button id="prevBtn">« Prev</button>
                 <input type="range" id="stepSlider" value="0" min="0" max="0" />
@@ -688,7 +756,6 @@ function getWebviewContent(sourceCode, traceData) {
             
             <div id="main">
                 <div id="codeDisplay"></div>
-                
                 <div id="sidebar">
                     <div id="varsDisplay"></div>
                     <div id="outputDisplay">
@@ -699,31 +766,46 @@ function getWebviewContent(sourceCode, traceData) {
             </div>
 
             <script>
-                // --- Data Injected from Extension ---
+                // --- Setup ---
+                const vscode = acquireVsCodeApi();
+                
+                // --- Injected Data ---
                 const sourceCode = ${safeSourceCode};
-                const trace = ${traceData};
-                // --- End of Injected Data ---
-
-                // --- Client-Side JS for the Player ---
+                const trace = ${traceData}; // This will be [] if it failed
+                const errorData = ${safeErrorData}; // This will have the error
+                
+                // --- State ---
                 let currentIndex = -1;
                 const codeLines = sourceCode.split('\\n');
 
+                // --- Get All DOM Elements ---
+                const errorDisplay = document.getElementById('errorDisplay');
+                const inputBox = document.getElementById('inputBox');
+                const rerunBtn = document.getElementById('rerunBtn');
                 const prevBtn = document.getElementById('prevBtn');
                 const nextBtn = document.getElementById('nextBtn');
                 const stepLabel = document.getElementById('stepLabel');
+                const stepSlider = document.getElementById('stepSlider');
                 const codeDisplay = document.getElementById('codeDisplay');
                 const varsDisplay = document.getElementById('varsDisplay');
                 const outputContent = document.getElementById('outputContent');
-                const stepSlider = document.getElementById('stepSlider'); // NEW: Get slider
+                
+                // --- Error Display Logic ---
+                if (errorData) {
+                    errorDisplay.innerHTML = \`
+                        <h4>Tracer Failed (check inputs or code):</h4>
+                        <pre>\${errorData}</pre>
+                    \`;
+                } else {
+                    errorDisplay.style.display = 'none'; // Hide if no error
+                }
 
-                // Function to render the current step
+                // --- Main Render Function ---
                 function render() {
-                    // 1. Update Buttons & Label
+                    // 1. Update Buttons, Label, Slider
                     prevBtn.disabled = (currentIndex <= 0);
                     nextBtn.disabled = (currentIndex >= trace.length - 1);
                     stepLabel.textContent = \`Step: \${currentIndex + 1} / \${trace.length}\`;
-                    
-                    // NEW: Update the slider's position
                     if (stepSlider) {
                         stepSlider.value = currentIndex;
                     }
@@ -771,25 +853,33 @@ function getWebviewContent(sourceCode, traceData) {
                         render();
                     }
                 };
-                
-                // NEW: Add event listener for the slider
-                // 'oninput' fires immediately as you drag
+
                 stepSlider.oninput = () => {
                     currentIndex = parseInt(stepSlider.value, 10);
                     render();
                 };
-
-                // Initial render (start at step 0)
-                if (trace.length > 0) {
-                    // NEW: Set the slider's max value
-                    stepSlider.max = trace.length - 1;
+                
+                rerunBtn.onclick = () => {
+                    const inputText = inputBox.value;
+                    // Convert literal newlines (from 'Enter') into the '\\n' string
+                    // that the command line argument expects.
+                    const safeInput = inputText.replace(/\\n/g, '\\\\n').replace(/\\n/g, '\\\\n');
                     
+                    // Send this new input back to the extension
+                    vscode.postMessage({
+                        command: 'rerun',
+                        text: safeInput
+                    });
+                };
+
+                // --- Initial Render ---
+                if (trace.length > 0) {
+                    stepSlider.max = trace.length - 1;
                     currentIndex = 0;
                     render();
                 } else {
                     stepLabel.textContent = "No steps recorded.";
                 }
-
             </script>
         </body>
         </html>
