@@ -897,10 +897,6 @@ Sent from VS Code Post-It Extension
 
     const notesHtml = this.notes
       .map((note) => {
-        // Check if content is long enough to need expand button
-        const needsExpand =
-          note.content.length > 200 || note.content.split("\n").length > 6;
-        const expandButtonStyle = needsExpand ? "" : "display: none;";
 
         // This is the full HTML for each note, including the email form
         return `
@@ -917,17 +913,14 @@ Sent from VS Code Post-It Extension
                     <div class="postit-content" id="content-${
                       note.id
                     }">${this.escapeHtml(note.content)}</div>
-                    <button class="expand-btn" title="Expand/Collapse Note" data-id="${
-                      note.id
-                    }" style="${expandButtonStyle}">▼</button>
                     <div class="postit-edit" id="edit-${
                       note.id
                     }" style="display: none;">
                         <textarea class="edit-textarea" id="textarea-${
                           note.id
                         }" placeholder="Edit your note...">${this.escapeHtml(
-          note.content
-        )}</textarea>
+                          note.content
+                        )}</textarea>
                         <div class="edit-buttons">
                             <button class="save-btn" data-id="${
                               note.id
@@ -1004,7 +997,7 @@ Sent from VS Code Post-It Extension
                     min-height: 100vh;
                 }
                 .container {
-                    max-width: 1200px;
+                    max-width: none;
                     margin: 0 auto;
                 }
                 h1 {
@@ -1018,6 +1011,7 @@ Sent from VS Code Post-It Extension
                     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
                     gap: 20px;
                     padding: 20px 0;
+                    position: relative;
                 }
                 .postit {
                     padding: 20px;
@@ -1030,12 +1024,51 @@ Sent from VS Code Post-It Extension
                     position: relative;
                     display: flex;
                     flex-direction: column;
-                    overflow: hidden;
+                    overflow: visible;
+                    cursor: move;
                 }
-                .postit.expanded {
+                .postit.expanded-edit {
+                    position: fixed;
+                    top: 5%;
+                    left: 5%;
+                    width: 70vw;
+                    height: 70vh;
+                    // transform: translate(-50%, -50%);
+                    z-index: 1000;
+                    overflow: hidden;
+                    box-shadow: 0 0 40px rgba(0, 0, 0, 0.7);
+                }
+                .postit.expanded-edit .edit-textarea {
+                    width: 100%;
+                    height: calc(100% - 50px);
+                    resize: none;
+                    overflow-y: auto;
+                    background: rgba(255, 255, 255, 0.15);
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    color: white;
+                    font-size: 14px;
+                    box-sizing: border-box;
+                }
+                .postit.expanded-edit .postit-content-wrapper {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    height: 100%;
+                }
+                .postit.expanded-edit:hover {
+                    transform: none;
+                    box-shadow: 0 0 40px rgba(0, 0, 0, 0.7);
+                }
+                .postit.expanded-email {
                     overflow: visible;
                     height: auto;
-                    min-height: 200px;
+                    min-height: 200px; /* Adjust as needed */
+                    background-color: #f0f0f0; /* Example: different background for email */
+                    transition: all 0.3s ease;
+                }
+                .postit.dimmed {
+                    opacity: 0.4;
+                    pointer-events: none;
                 }
                 .postit:hover {
                     transform: rotate(0deg) scale(1.05);
@@ -1063,7 +1096,7 @@ Sent from VS Code Post-It Extension
                     position: relative;
                     padding-right: 20px;
                 }
-                .postit.expanded .postit-content-wrapper {
+                .postit.expanded-email .postit-content-wrapper {
                     overflow: visible; 
                 }                
                 .postit-content {
@@ -1082,10 +1115,11 @@ Sent from VS Code Post-It Extension
                     word-wrap: break-word;
                     white-space: pre-wrap;
                 }
-                .postit-content.expanded {
+                .postit-content.expanded-email {
                     -webkit-line-clamp: unset;
                     overflow: visible;
                     max-height: none;
+                    max-width: none;
                     display: block;
                 }
                 .postit-footer {
@@ -1138,15 +1172,15 @@ Sent from VS Code Post-It Extension
                     cursor: pointer;
                     transition: background 0.2s ease;
                 }
-                .edit-btn:hover, .email-btn:hover {
+                .email-btn:hover, .edit-btn:hover {
                     background: rgba(0, 0, 0, 0.4);
                 }
                 .postit-edit {
                     margin-top: 10px;
                 }
                 .edit-textarea {
-                    width: 100%;
-                    min-height: 100px;
+                    min-width: 100%;
+                    min-height: 500%;
                     padding: 10px;
                     border: 1px solid rgba(255, 255, 255, 0.3);
                     border-radius: 4px;
@@ -1155,7 +1189,6 @@ Sent from VS Code Post-It Extension
                     font-family: 'Courier New', monospace;
                     font-size: 13px;
                     line-height: 1.4;
-                    resize: vertical;
                     outline: none;
                     box-sizing: border-box;
                 }
@@ -1407,61 +1440,124 @@ Sent from VS Code Post-It Extension
                     btn.addEventListener('click', (e) => {
                         const noteEl = e.target.closest('.postit');
                         const noteId = noteEl.getAttribute('data-id');
-                        vscode.postMessage({ type: 'editNote', id: noteId });
+
+                        // Toggle edit mode for this note
+                        if (noteEl.classList.contains('expanded-edit')) {
+                            exitEditMode(noteId);
+                        } else {
+                            enterEditMode(noteId);
+                            noteEl.classList.add('expanded-edit');
+                            noteEl.classList.remove('expanded');   
+                        }
                     });
                 });
+
+                function enterEditMode(noteId) {
+                    const noteElement = document.querySelector(\`.postit[data-id="\${noteId}"]\`);
+                    const contentDiv = document.getElementById(\`content-\${noteId}\`);
+                    const editDiv = document.getElementById(\`edit-\${noteId}\`);
+                    const textarea = document.getElementById(\`textarea-\${noteId}\`);
+
+                    // Expand and center the note
+                    noteElement.classList.add('expanded-edit');
+
+                    // Dim other notes
+                    document.querySelectorAll('.postit').forEach(otherNote => {
+                        if (otherNote !== noteElement) {
+                            otherNote.classList.add('dimmed'); // Apply dimming effect to other notes
+                        }
+                    });
+
+                    // Show the edit form
+                    contentDiv.style.display = 'none';
+                    editDiv.style.display = 'block';
+
+                    // Set the textarea content to the current content of the note
+                    textarea.value = contentDiv.textContent.trim(); // Assuming you're copying the content to the textarea
+                    textarea.focus();
+                    textarea.select();
+
+                    // Set the editing state to the current noteId
+                    editingNoteId = noteId;
+                }
+
+                // Function to exit edit mode
+                function exitEditMode(noteId) {
+                    const noteElement = document.querySelector(\`.postit[data-id="\${noteId}"]\`);
+                    const contentDiv = document.getElementById(\`content-\${noteId}\`);
+                    const editDiv = document.getElementById(\`edit-\${noteId}\`);
+
+                    if (!noteElement) return;
+
+                    // Revert to normal state
+                    noteElement.classList.remove('expanded', 'expanded-edit');
+                    noteElement.style.position = '';
+                    noteElement.style.top = '';
+                    noteElement.style.left = '';
+                    noteElement.style.transform = '';
+                    noteElement.style.width = '';
+                    noteElement.style.height = '';
+                    noteElement.style.zIndex = '';
+                    noteElement.style.transition = '';
+
+                    // Remove dimming from other notes
+                    document.querySelectorAll('.postit').forEach(otherNote => {
+                        otherNote.classList.remove('dimmed');
+                    });
+
+                    // Show the content and hide the edit form
+                    if (contentDiv && editDiv) {
+                        contentDiv.style.display = 'block';
+                        editDiv.style.display = 'none';
+                    }
+
+                    // Remove global expanded-mode lock
+                    document.body.classList.remove('expanded-mode');
+
+                    editingNoteId = null;
+                }
+
 
                 document.querySelectorAll('.email-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
-                        const noteId = e.target.getAttribute('data-id');
-                        vscode.postMessage({ type: 'toggleEmailMode', noteId: noteId });
-                    });
-                });
+                      const noteId = e.target.getAttribute('data-id');
+                      const noteElement = document.querySelector(\`.postit[data-id="\${noteId}"]\`);
+                      const contentDiv = document.getElementById(\`content-\${noteId}\`);
+                      const emailDiv = document.getElementById(\`email-\${noteId}\`);
+                      const userInput = document.getElementById(\`userInput-\${noteId}\`);
 
-                document.querySelectorAll('.expand-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        const noteId = e.target.getAttribute('data-id');
-                        const noteElement = e.target.closest('.postit');
-                        const content = document.getElementById('content-' + noteId);
-                        const expandBtn = e.target;
-                        
-                        if (noteElement.classList.contains('expanded')) {
-                            noteElement.classList.remove('expanded');
-                            content.classList.remove('expanded');
-                            expandBtn.textContent = '▼';
-                            expandBtn.classList.remove('expanded');
-                        } else {
-                            noteElement.classList.add('expanded');
-                            content.classList.add('expanded');
-                            expandBtn.textContent = '▲';
-                            expandBtn.classList.add('expanded');
-                        }
-                    });
+                      // Prevent expanding the note for email mode
+                      noteElement.classList.add('expanded-email');  // Use email-specific expanded class
+                      noteElement.classList.remove('expanded-edit'); // Remove edit-specific expanded class
+
+                      contentDiv.style.display = 'none';
+                      emailDiv.style.display = 'block';
+                      userInput.focus();
+                  });
                 });
 
                 document.querySelectorAll('.save-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         const noteId = e.target.getAttribute('data-id');
-                        const textarea = document.getElementById('textarea-' + noteId);
+                        const textarea = document.getElementById(\`textarea-\${noteId}\`);
                         const content = textarea.value;
+                        
+                        // Post save event
                         vscode.postMessage({ 
                             type: 'saveNoteEdit', 
                             noteId: noteId, 
                             content: content 
                         });
+
+                        // Exit edit mode after save
+                        exitEditMode(noteId);
                     });
                 });
 
                 document.querySelectorAll('.cancel-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         const noteId = e.target.getAttribute('data-id');
-                        vscode.postMessage({ 
-                            type: 'cancelEdit', 
-                            noteId: noteId 
-                        });
+                        exitEditMode(noteId);
                     });
                 });
 
@@ -1641,6 +1737,18 @@ Sent from VS Code Post-It Extension
                         contentDiv.style.display = 'block';
                         emailDiv.style.display = 'none';
                         noteElement.classList.remove('expanded');
+                    }
+                });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        // Find the currently expanded note, if any
+                        const expandedNote = document.querySelector('.postit.expanded-edit');
+                        if (expandedNote) {
+                            const noteId = expandedNote.getAttribute('data-id');
+                            if (noteId) {
+                                exitEditMode(noteId);
+                            }
+                        }
                     }
                 });
             </script>
