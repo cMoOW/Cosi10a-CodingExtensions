@@ -250,7 +250,7 @@ Sent from VS Code Post-It Extension
         "Post-It Note from VS Code Extension"
       );
       // Store the user's email for future use
-    this.context.globalState.update('myExtension.userEmail', userEmail);
+      this.context.globalState.update("myExtension.userEmail", userEmail);
 
       vscode.window.showInformationMessage(
         `Note emailed to: ${brandeisEmails.join(", ")}`
