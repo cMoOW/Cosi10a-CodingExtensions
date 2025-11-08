@@ -1,51 +1,72 @@
 import sys
 import json
 import io
-import os # <-- NEW: Import the 'os' module
+import os
 
 redirected_stdout = io.StringIO()
 execution_trace = []
-main_filename = None # We'll store the *absolute* path here
+main_filename = None # Will store the *absolute, normalized* path
 
-# --- MockStdin class (unchanged) ---
 class MockStdin:
     def readline(self):
         return "\n"
 
-# --- safe_serialize function (unchanged) ---
 def safe_serialize(obj):
+    """
+    A faster, safer serializer.
+    It only serializes basic, JSON-safe types.
+    """
     safe_vars = {}
     if not isinstance(obj, dict):
         return {}
+
     for key, value in obj.items():
+        # Ignore modules, callables, and private vars
         if key.startswith('__') or callable(value) or 'module' in str(type(value)):
             continue
-        try:
-            safe_vars[key] = str(value)
-        except Exception:
-            safe_vars[key] = "[Unserializable]"
+        
+        # --- OPTIMIZATION ---
+        # Only capture simple, serializable types
+        if isinstance(value, (int, float, str, bool, list, dict, set, tuple, type(None))):
+            try:
+                # repr() is often safer/faster for simple types
+                safe_vars[key] = repr(value)
+            except Exception:
+                safe_vars[key] = "[Unserializable]"
+        else:
+            # For complex objects, just show the type
+            safe_vars[key] = f"<type {type(value).__name__}>"
+        # --------------------
+            
     return safe_vars
 
-# --- tracer function (THIS IS THE FIX) ---
+
 def tracer(frame, event, arg):
+    """
+    The main tracer function, now optimized.
+    It only checks the filename on 'call' events.
+    """
     global redirected_stdout
-    global main_filename 
+    global main_filename
 
-    # --- THE FIX ---
-    # We now get the *absolute* path of the current frame's file
-    # and compare it to the *absolute* path of our main script.
-    try:
-        frame_filename = os.path.abspath(frame.f_code.co_filename)
-    except Exception:
-        # Handle edge cases where a filename is not available (e.g., <string>)
-        return None
-
-    if frame_filename != main_filename:
-        # Not in our file, so stop tracing this frame (e.g., an import)
-        return None
-    # ---------------
-
+    # --- OPTIMIZATION ---
+    # We only check the filename when we ENTER a new function/module
+    if event == 'call':
+        try:
+            frame_filename = os.path.normcase(os.path.abspath(frame.f_code.co_filename))
+        except Exception:
+            return None # Not a file, don't trace
+        
+        if frame_filename != main_filename:
+            return None # Not our code, don't trace
+        
+        # It IS our code, so trace this frame.
+        return tracer 
+    
+    # We are only here if it's a 'line' (or other) event
+    # in a frame we've already approved.
     if event == 'line':
+    # --------------------
         output = redirected_stdout.getvalue()
         redirected_stdout.seek(0)
         redirected_stdout.truncate(0)
@@ -66,7 +87,7 @@ def tracer(frame, event, arg):
     
     return tracer
 
-# --- Main script execution (THIS IS THE OTHER PART OF THE FIX) ---
+# --- Main script execution (Unchanged, but uses new tracer) ---
 if __name__ == "__main__":
     #global main_filename
 
@@ -76,10 +97,10 @@ if __name__ == "__main__":
         
     script_to_run = sys.argv[1]
     
-    # ... (stdout/stdin redirection is unchanged) ...
     original_stdout = sys.stdout
     sys.stdout = redirected_stdout
     original_stdin = sys.stdin
+    
     if len(sys.argv) > 2 and sys.argv[2]:
         input_data = sys.argv[2].replace("\\n", "\n")
         sys.stdin = io.StringIO(input_data)
@@ -92,10 +113,8 @@ if __name__ == "__main__":
 
         main_code_object = compile(script_content, script_to_run, 'exec')
         
-        # --- THE FIX ---
-        # Store the normalized, *absolute* path of the script.
-        main_filename = os.path.abspath(main_code_object.co_filename)
-        # ---------------
+        # Store the normalized, absolute path of the script.
+        main_filename = os.path.normcase(os.path.abspath(main_code_object.co_filename))
         
         sys.settrace(tracer)
         scope = {}
@@ -108,10 +127,10 @@ if __name__ == "__main__":
         sys.exit(1)
         
     finally:
-        # ... (rest of finally block is unchanged) ...
         sys.settrace(None)
         sys.stdout = original_stdout
         sys.stdin = original_stdin 
+        
         final_output = redirected_stdout.getvalue()
         if final_output and execution_trace:
             execution_trace[-1]['output'] += final_output

@@ -288,7 +288,7 @@ function activate(context) {
         debounceTimer = setTimeout(() => {
             associatedDocument = event.document;
             runTracerAndPostUpdate(context); // Run and post update
-        }, 1500); 
+        }, 750); // 750ms debounce
     });
 
     context.subscriptions.push(startCommand, changeListener);
@@ -651,15 +651,16 @@ function getUserEmail(context) {
 
 /**
  * Generates the full HTML/CSS/JS "shell" for the Webview.
+ * This version uses a fade-out/fade-in for updates instead of a full overlay.
  *
  * @param {string} sourceCode - The Python source code.
  * @param {string} traceData - The JSON string of the execution trace ("[]" if error).
  * @param {string} currentInputs - The input string that was used for this run.
- *Read-only
  * @param {string | null} errorData - The error message, if any.
  */
 function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
     
+    // Safely embed all the data into the HTML
     const safeSourceCode = JSON.stringify(sourceCode);
     const safeErrorData = JSON.stringify(errorData || null);
     
@@ -681,6 +682,8 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
                     background-color: var(--vscode-editor-background);
                 }
                 h4 { margin-top: 0; }
+                
+                /* --- Error Display --- */
                 #errorDisplay {
                     padding: 10px;
                     background-color: #5c2121;
@@ -688,6 +691,8 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
                 }
                 #errorDisplay h4 { margin: 0 0 5px 0; color: #ffcccc; }
                 #errorDisplay pre { white-space: pre-wrap; color: white; margin: 0; }
+
+                /* --- Input Area --- */
                 #inputArea {
                     padding: 10px;
                     border-bottom: 1px solid var(--vscode-sideBar-border, #333);
@@ -701,11 +706,14 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
                     border: 1px solid var(--vscode-input-border);
                 }
                 #rerunBtn { margin-top: 5px; background-color: #098309; }
+
+                /* --- Controls --- */
                 #controls { 
                     padding: 10px; 
                     border-bottom: 1px solid var(--vscode-sideBar-border, #333); 
                     display: flex; 
                     align-items: center; 
+                    transition: opacity 0.15s ease-in-out;
                 }
                 #stepLabel { margin: 0 10px; min-width: 100px; text-align: right; }
                 button { 
@@ -718,7 +726,14 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
                 }
                 button:disabled { background-color: #555; }
                 #stepSlider { flex-grow: 1; margin: 0 10px; }
-                #main { display: flex; flex: 1; overflow: hidden; }
+
+                /* --- Main Layout --- */
+                #main { 
+                    display: flex; 
+                    flex: 1; 
+                    overflow: hidden; 
+                    transition: opacity 0.15s ease-in-out;
+                }
                 #codeDisplay {
                     font-family: "Consolas", "Courier New", monospace;
                     padding: 15px;
@@ -748,37 +763,31 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
                 .highlight-line { 
                     background-color: var(--vscode-editor-selectionBackground, rgba(255, 255, 0, 0.3)); 
                 }
-                #loadingOverlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: var(--vscode-editor-background, #222);
-                    opacity: 0.8;
-                    color: var(--vscode-editor-foreground, white);
-                    display: none; /* Hidden by default */
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 1.5em;
-                    z-index: 1000;
+
+                /* --- NEW: Seamless Loading Style --- */
+                /* When loading, we'll just fade the main content */
+                body.loading #main,
+                body.loading #controls {
+                    opacity: 0.5;
                 }
             </style>
         </head>
         <body>
-            <div id="loadingOverlay">Running...</div>
             <div id="errorDisplay"></div>
+
             <div id="inputArea">
                 <h4>Program Input (one per line)</h4>
                 <textarea id="inputBox" rows="3"></textarea>
                 <button id="rerunBtn">Re-run Visualization</button>
             </div>
+
             <div id="controls">
                 <button id="prevBtn">« Prev</button>
                 <input type="range" id="stepSlider" value="0" min="0" max="0" />
                 <button id="nextBtn">Next »</button>
                 <span id="stepLabel">Step: 0 / 0</span>
             </div>
+            
             <div id="main">
                 <div id="codeDisplay"></div>
                 <div id="sidebar">
@@ -793,21 +802,14 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
             <script>
                 const vscode = acquireVsCodeApi();
                 
-                // --- Global State ---
+                // --- Global State (will be updated by messages) ---
                 let sourceCode = ${safeSourceCode};
-                
-                // --- THIS IS THE FIX ---
-                // traceData is already a JS literal string (e.g., "[]")
-                // We assign it directly to become a JS object.
-                let trace = ${traceData};
-                // -----------------------
-                
+                let trace = ${traceData}; // This is a JS object (from "[]")
                 let errorData = ${safeErrorData};
                 let currentIndex = -1;
                 let codeLines = sourceCode.split('\\n');
 
                 // --- Get All DOM Elements ---
-                const loadingOverlay = document.getElementById('loadingOverlay');
                 const errorDisplay = document.getElementById('errorDisplay');
                 const inputBox = document.getElementById('inputBox');
                 const rerunBtn = document.getElementById('rerunBtn');
@@ -819,8 +821,9 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
                 const varsDisplay = document.getElementById('varsDisplay');
                 const outputContent = document.getElementById('outputContent');
                 
-                // --- Main Render Function ---
+                // --- Main Render Function (unchanged) ---
                 function render() {
+                    // 1. Update Buttons, Label, Slider
                     prevBtn.disabled = (currentIndex <= 0);
                     nextBtn.disabled = (currentIndex >= trace.length - 1);
                     stepLabel.textContent = \`Step: \${currentIndex + 1} / \${trace.length}\`;
@@ -830,6 +833,7 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
                     const step = trace[currentIndex];
                     const currentLine = step.line_no;
 
+                    // 2. Render Code + Highlight
                     let codeHtml = '';
                     for (let i = 0; i < codeLines.length; i++) {
                         const lineClass = (i + 1 === currentLine) ? 'highlight-line' : '';
@@ -838,10 +842,12 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
                     }
                     codeDisplay.innerHTML = codeHtml;
 
+                    // 3. Render Variables
                     let varsHtml = '<h4>Local Variables</h4>';
                     varsHtml += JSON.stringify(step.local_vars, null, 2);
                     varsDisplay.innerHTML = varsHtml;
                     
+                    // 4. Render Cumulative Output
                     let cumulativeOutput = '';
                     for (let i = 0; i <= currentIndex; i++) {
                         if (trace[i].output) {
@@ -898,11 +904,13 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
                     
                     switch (message.command) {
                         case 'showLoading':
-                            loadingOverlay.style.display = 'flex';
+                            // --- MODIFIED ---
+                            document.body.classList.add('loading');
                             break;
                         
                         case 'updateTrace':
-                            loadingOverlay.style.display = 'none';
+                            // --- MODIFIED ---
+                            document.body.classList.remove('loading');
                             updateUI(
                                 message.sourceCode,
                                 message.traceData, // This is a JSON string
@@ -944,8 +952,7 @@ function getWebviewContent(sourceCode, traceData, currentInputs, errorData) {
                 };
 
                 // --- Initial Render ---
-                // We now call updateUI, passing the stringified version
-                // of our initial trace object.
+                // (This runs once when the HTML is first loaded)
                 updateUI(sourceCode, JSON.stringify(trace), errorData, "${currentInputs}");
             </script>
         </body>
