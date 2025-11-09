@@ -52,35 +52,93 @@ class NoteManager {
   /**
    * Add a new note
    */
-  async addNote(message) {
-    if (message && message.trim()) {
-      const newNote = {
-        id: Date.now(),
-        content: message.trim(),
-        timestamp: new Date().toISOString(),
-        color: await this.selectNoteColor(),
-      };
+  // async addNote(message) {
+  //   if (message && message.trim()) {
+  //     const { data, error } = await supabase
+  //     .from("tickets")
+  //     .insert([
+  //       {
+  //         message: message.trim(),            // your note content
+  //         created_at: new Date().toISOString(), // timestamp
+  //         student_email: userEmail,           // optional
+  //         color: newNote.color                // if you added a color column
+  //       }
+  //     ]);
 
-      this.notes.push(newNote);
-      await this.saveNotes();
+  //   if (error) {
+  //     console.error("Error saving note to Supabase:", error);
+  //   } else {
+  //     console.log("Note saved to Supabase:", data);
+  //   }
 
-      vscode.window.showInformationMessage(
-        ` Note added: "${message.substring(0, 30)}${
-          message.length > 30 ? "..." : ""
-        }"`
-      );
 
-      // Refresh the active panel if it exists
-      if (this.activePanel) {
-        this.activePanel.webview.html = this.getWebviewContent();
-      }
+  //     this.notes.push(newNote);
+  //     await this.saveNotes();
 
-      return newNote;
+  //     vscode.window.showInformationMessage(
+  //       ` Note added: "${message.substring(0, 30)}${
+  //         message.length > 30 ? "..." : ""
+  //       }"`
+  //     );
+
+  //     // Refresh the active panel if it exists
+  //     if (this.activePanel) {
+  //       this.activePanel.webview.html = this.getWebviewContent();
+  //     }
+
+  //     return newNote;
+  //   }
+
+  //   return null;
+  // }
+
+  async addNote(message, userEmail) {
+    if (!message || !message.trim()) return null;
+  
+    // Optional: pick a random color for local display
+    const color = await this.selectNoteColor();
+  
+    // Insert into Supabase
+    const { data, error } = await supabase
+      .from("tickets")
+      .insert([
+        {
+          message: message.trim(),
+          created_at: new Date().toISOString(),
+          student_email: userEmail, // pass it in when calling addNote
+        }
+      ]);
+  
+    if (error) {
+      console.error("Error saving note to Supabase:", error);
+    } else {
+      console.log("Note saved to Supabase:", data);
     }
-
-    return null;
+  
+    // Add to local storage / VS Code panel
+    const newNote = {
+      id: Date.now(),
+      content: message.trim(),
+      timestamp: new Date().toISOString(),
+      color: color,
+    };
+  
+    this.notes.push(newNote);
+    await this.saveNotes();
+  
+    vscode.window.showInformationMessage(
+      `Note added: "${message.substring(0, 30)}${
+        message.length > 30 ? "..." : ""
+      }"`
+    );
+  
+    if (this.activePanel) {
+      this.activePanel.webview.html = this.getWebviewContent();
+    }
+  
+    return newNote;
   }
-
+  
   /**
    * Show floating note editor for adding new notes
    */

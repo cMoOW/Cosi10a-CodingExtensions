@@ -5,7 +5,7 @@ const fs = require("fs");
 const dotenv = require("dotenv");
 
 // ✅ Make absolutely sure the .env file exists and load it
-const envPath = path.join(__dirname, ".env");
+const envPath = path.resolve(__dirname, ".env");
 
 if (fs.existsSync(envPath)) {
   console.log("🟢 Loading .env from:", envPath);
@@ -14,8 +14,8 @@ if (fs.existsSync(envPath)) {
   console.error("❌ .env file not found at:", envPath);
 }
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
 console.log("🌍 ENV CHECK:", {
   VITE_SUPABASE_URL: supabaseUrl,

@@ -2,6 +2,7 @@ const vscode = require("vscode");
 const fs = require("fs");
 const path = require("path");
 const { supabase } = require("../supabaseClient");
+console.log("Supabase client loaded:", !!supabase);
 
 
 class NoteManager {
@@ -55,12 +56,38 @@ class NoteManager {
    */
   async addNote(message) {
     if (message && message.trim()) {
-      const newNote = {
-        id: Date.now(),
-        content: message.trim(),
-        timestamp: new Date().toISOString(),
-        color: await this.selectNoteColor(),
-      };
+      const { data, error } = await supabase
+      .from("tickets")
+      .insert([
+        {
+          message: message.trim(),            // your note content
+          created_at: new Date().toISOString(), // timestamp
+          student_email: userEmail,           // optional
+          color: newNote.color                // if you added a color column
+        }
+      ]);
+
+    if (error) {
+      console.error("Error saving note to Supabase:", error);
+    } else {
+      console.log("Note saved to Supabase:", data);
+    }
+
+    //   const { data, error } = await supabase
+    //   .from("tickets")
+    //   .insert([{ content: message.trim(), timestamp: new Date().toISOString(), color: newNote.color }]);
+
+    // if (error) {
+    //   console.error("Error saving note to Supabase:", error);
+    // } else {
+    //   console.log("Note saved to Supabase:", data);
+    // }
+      // const newNote = {
+      //   id: Date.now(),
+      //   content: message.trim(),
+      //   timestamp: new Date().toISOString(),
+      //   color: await this.selectNoteColor(),
+      // };
 
       this.notes.push(newNote);
       await this.saveNotes();
