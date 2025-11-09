@@ -1,6 +1,7 @@
 const vscode = require("vscode");
 const fs = require("fs");
 const path = require("path");
+const { supabase } = require("../supabaseClient");
 
 class NoteManager {
   constructor(context, onNotesChanged = null) {

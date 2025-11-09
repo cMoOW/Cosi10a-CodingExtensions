@@ -1,4 +1,6 @@
 const nodemailer  =  require('nodemailer'); 
+const { supabase } = require("../supabaseClient");
+
 
 
 

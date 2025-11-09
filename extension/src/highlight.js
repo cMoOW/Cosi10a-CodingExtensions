@@ -1,5 +1,7 @@
 // todoDecorator.js
 const vscode = require('vscode');
+const { supabase } = require("../supabaseClient");
+
 
 // A module-level variable to hold the decoration type
 let todoDecorationType;
