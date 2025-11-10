@@ -7,7 +7,10 @@ const { sendEmail } = require('./src/send-email.js');
 const { NoteManager } = require('./PostIt/noteManager');
 const { EmailUIManager } = require('./PostIt/emailUIManager');
 
+const visualizer = require('./src/visualizer.js');
 const EMAIL_KEY = 'myExtension.userEmail';
+
+
 
 // This method is called when your extension is activated
 /**
@@ -139,6 +142,10 @@ function activate(context) {
 
 	// highlight TODO: Uncomment this line to enable the highlighter functionality
 	// activateHighlighter(context);
+   
+    // Activate the python visualizer 
+    visualizer.activate(context);
+
 }
 
 
@@ -157,7 +164,9 @@ function getUserEmail(context) {
 }
 
 // This method is called when your extension is deactivated
-function deactivate() {}
+function deactivate() {
+    visualizer.deactivate();
+}
 
 module.exports = {
 	activate,
