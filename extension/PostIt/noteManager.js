@@ -2,8 +2,6 @@ const vscode = require("vscode");
 const fs = require("fs");
 const path = require("path");
 const { supabase } = require("../supabaseClient");
-console.log("Supabase client loaded:", !!supabase);
-
 
 class NoteManager {
   constructor(context, onNotesChanged = null) {
@@ -20,12 +18,12 @@ class NoteManager {
       this.notes.length,
       "existing notes"
     );
-    this.emailList = {
-      "Brian Shen": "brianshen@brandeis.edu",
-      "Apoorva Uppal": "auppal@brandeis.edu",
-      "Jacob Carminati": "jacobcarminati@brandeis.edu",
-      "SiMing Lin": "siminglin@brandeis.edu",
-    };
+    this.emailList = [
+      "brianshen@brandeis.edu",
+      "auppal@brandeis.edu",
+      "jacobcarminati@brandeis.edu",
+      "siminglin@brandeis.edu",
+    ];
   }
 
   /**
@@ -54,61 +52,93 @@ class NoteManager {
   /**
    * Add a new note
    */
-  async addNote(message) {
-    if (message && message.trim()) {
-      const { data, error } = await supabase
+  // async addNote(message) {
+  //   if (message && message.trim()) {
+  //     const { data, error } = await supabase
+  //     .from("tickets")
+  //     .insert([
+  //       {
+  //         message: message.trim(),            // your note content
+  //         created_at: new Date().toISOString(), // timestamp
+  //         student_email: userEmail,           // optional
+  //         color: newNote.color                // if you added a color column
+  //       }
+  //     ]);
+
+  //   if (error) {
+  //     console.error("Error saving note to Supabase:", error);
+  //   } else {
+  //     console.log("Note saved to Supabase:", data);
+  //   }
+
+
+  //     this.notes.push(newNote);
+  //     await this.saveNotes();
+
+  //     vscode.window.showInformationMessage(
+  //       ` Note added: "${message.substring(0, 30)}${
+  //         message.length > 30 ? "..." : ""
+  //       }"`
+  //     );
+
+  //     // Refresh the active panel if it exists
+  //     if (this.activePanel) {
+  //       this.activePanel.webview.html = this.getWebviewContent();
+  //     }
+
+  //     return newNote;
+  //   }
+
+  //   return null;
+  // }
+
+  async addNote(message, userEmail) {
+    if (!message || !message.trim()) return null;
+  
+    // Optional: pick a random color for local display
+    const color = await this.selectNoteColor();
+  
+    // Insert into Supabase
+    const { data, error } = await supabase
       .from("tickets")
       .insert([
         {
-          message: message.trim(),            // your note content
-          created_at: new Date().toISOString(), // timestamp
-          student_email: userEmail,           // optional
-          color: newNote.color                // if you added a color column
+          message: message.trim(),
+          created_at: new Date().toISOString(),
+          student_email: userEmail, // pass it in when calling addNote
         }
       ]);
-
+  
     if (error) {
       console.error("Error saving note to Supabase:", error);
     } else {
       console.log("Note saved to Supabase:", data);
     }
-
-    //   const { data, error } = await supabase
-    //   .from("tickets")
-    //   .insert([{ content: message.trim(), timestamp: new Date().toISOString(), color: newNote.color }]);
-
-    // if (error) {
-    //   console.error("Error saving note to Supabase:", error);
-    // } else {
-    //   console.log("Note saved to Supabase:", data);
-    // }
-      // const newNote = {
-      //   id: Date.now(),
-      //   content: message.trim(),
-      //   timestamp: new Date().toISOString(),
-      //   color: await this.selectNoteColor(),
-      // };
-
-      this.notes.push(newNote);
-      await this.saveNotes();
-
-      vscode.window.showInformationMessage(
-        ` Note added: "${message.substring(0, 30)}${
-          message.length > 30 ? "..." : ""
-        }"`
-      );
-
-      // Refresh the active panel if it exists
-      if (this.activePanel) {
-        this.activePanel.webview.html = this.getWebviewContent();
-      }
-
-      return newNote;
+  
+    // Add to local storage / VS Code panel
+    const newNote = {
+      id: Date.now(),
+      content: message.trim(),
+      timestamp: new Date().toISOString(),
+      color: color,
+    };
+  
+    this.notes.push(newNote);
+    await this.saveNotes();
+  
+    vscode.window.showInformationMessage(
+      `Note added: "${message.substring(0, 30)}${
+        message.length > 30 ? "..." : ""
+      }"`
+    );
+  
+    if (this.activePanel) {
+      this.activePanel.webview.html = this.getWebviewContent();
     }
-
-    return null;
+  
+    return newNote;
   }
-
+  
   /**
    * Show floating note editor for adding new notes
    */
@@ -177,12 +207,6 @@ class NoteManager {
       }
     );
 
-    const iconPath = vscode.Uri.file(
-      path.join(this.context.extensionPath, "PostIt", "post_it_storage.png") // Can also be post_it_logo
-    );
-    panel.iconPath = iconPath;
-
-    
     panel.webview.html = this.getInlineEditorHTML(initialContent);
 
     // Handle messages from the inline editor
@@ -279,7 +303,7 @@ Sent from VS Code Post-It Extension
         "Post-It Note from VS Code Extension"
       );
       // Store the user's email for future use
-      this.context.globalState.update("myExtension.userEmail", userEmail);
+    this.context.globalState.update('myExtension.userEmail', userEmail);
 
       vscode.window.showInformationMessage(
         `Note emailed to: ${brandeisEmails.join(", ")}`
@@ -311,11 +335,6 @@ Sent from VS Code Post-It Extension
 
     // If there's already an active panel, just refresh it
     if (this.activePanel) {
-      const iconPath = vscode.Uri.file(
-        path.join(this.context.extensionPath, "PostIt", "post_it_storage.png")
-      );
-      this.activePanel.iconPath = iconPath;
-
       this.activePanel.webview.html = this.getWebviewContent();
       this.activePanel.reveal(vscode.ViewColumn.One);
       return;
@@ -358,7 +377,7 @@ Sent from VS Code Post-It Extension
               panel.webview.html = this.getWebviewContent(); // Refresh view
             }
           });
-        
+
         panel.webview.html = this.getWebviewContent(); // Refresh view
       }
 
@@ -462,10 +481,6 @@ Sent from VS Code Post-It Extension
         });
       }
     });
-    const iconPath = vscode.Uri.file(
-      path.join(this.context.extensionPath, "PostIt", "post_it_storage.png")
-    );
-    panel.iconPath = iconPath;
 
     panel.webview.html = this.getWebviewContent();
   }
@@ -506,7 +521,6 @@ Sent from VS Code Post-It Extension
 
   /**
    * Get floating editor HTML content
-   * !Ask why this is here!
    */
   getFloatingEditorHTML(initialContent = "") {
     return `<!DOCTYPE html>
@@ -784,7 +798,7 @@ Sent from VS Code Post-It Extension
                 }
                 .editor-title {
                     color: #cccccc;
-                    font-size: 18px;
+                    font-size: 14px;
                     font-weight: 600;
                     margin: 0;
                 }
@@ -822,7 +836,6 @@ Sent from VS Code Post-It Extension
                     display: flex;
                     gap: 8px;
                     margin-top: 10px;
-                    margin-bottom: 10px;
                     justify-content: flex-end;
                 }
                 .save-btn, .cancel-btn {
@@ -922,10 +935,14 @@ Sent from VS Code Post-It Extension
    * Get webview HTML content
    */
   getWebviewContent() {
-    const userEmail = require("../extension").getUserEmail(this.context) || "";
+    const userEmail = require("../extension.js").getUserEmail(this.context) || "";
 
     const notesHtml = this.notes
       .map((note) => {
+        // Check if content is long enough to need expand button
+        const needsExpand =
+          note.content.length > 200 || note.content.split("\n").length > 6;
+        const expandButtonStyle = needsExpand ? "" : "display: none;";
 
         // This is the full HTML for each note, including the email form
         return `
@@ -942,14 +959,17 @@ Sent from VS Code Post-It Extension
                     <div class="postit-content" id="content-${
                       note.id
                     }">${this.escapeHtml(note.content)}</div>
+                    <button class="expand-btn" title="Expand/Collapse Note" data-id="${
+                      note.id
+                    }" style="${expandButtonStyle}">▼</button>
                     <div class="postit-edit" id="edit-${
                       note.id
                     }" style="display: none;">
                         <textarea class="edit-textarea" id="textarea-${
                           note.id
                         }" placeholder="Edit your note...">${this.escapeHtml(
-                          note.content
-                        )}</textarea>
+          note.content
+        )}</textarea>
                         <div class="edit-buttons">
                             <button class="save-btn" data-id="${
                               note.id
@@ -1026,7 +1046,7 @@ Sent from VS Code Post-It Extension
                     min-height: 100vh;
                 }
                 .container {
-                    max-width: none;
+                    max-width: 1200px;
                     margin: 0 auto;
                 }
                 h1 {
@@ -1040,7 +1060,6 @@ Sent from VS Code Post-It Extension
                     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
                     gap: 20px;
                     padding: 20px 0;
-                    position: relative;
                 }
                 .postit {
                     padding: 20px;
@@ -1053,51 +1072,12 @@ Sent from VS Code Post-It Extension
                     position: relative;
                     display: flex;
                     flex-direction: column;
-                    overflow: visible;
-                    cursor: move;
-                }
-                .postit.expanded-edit {
-                    position: fixed;
-                    top: 5%;
-                    left: 5%;
-                    width: 70vw;
-                    height: 70vh;
-                    // transform: translate(-50%, -50%);
-                    z-index: 1000;
                     overflow: hidden;
-                    box-shadow: 0 0 40px rgba(0, 0, 0, 0.7);
                 }
-                .postit.expanded-edit .edit-textarea {
-                    width: 100%;
-                    height: calc(100% - 50px);
-                    resize: none;
-                    overflow-y: auto;
-                    background: rgba(255, 255, 255, 0.15);
-                    border: 1px solid rgba(255, 255, 255, 0.3);
-                    color: white;
-                    font-size: 14px;
-                    box-sizing: border-box;
-                }
-                .postit.expanded-edit .postit-content-wrapper {
-                    flex: 1;
-                    display: flex;
-                    flex-direction: column;
-                    height: 100%;
-                }
-                .postit.expanded-edit:hover {
-                    transform: none;
-                    box-shadow: 0 0 40px rgba(0, 0, 0, 0.7);
-                }
-                .postit.expanded-email {
+                .postit.expanded {
                     overflow: visible;
                     height: auto;
-                    min-height: 200px; /* Adjust as needed */
-                    background-color: #f0f0f0; /* Example: different background for email */
-                    transition: all 0.3s ease;
-                }
-                .postit.dimmed {
-                    opacity: 0.4;
-                    pointer-events: none;
+                    min-height: 200px;
                 }
                 .postit:hover {
                     transform: rotate(0deg) scale(1.05);
@@ -1125,7 +1105,7 @@ Sent from VS Code Post-It Extension
                     position: relative;
                     padding-right: 20px;
                 }
-                .postit.expanded-email .postit-content-wrapper {
+                .postit.expanded .postit-content-wrapper {
                     overflow: visible; 
                 }                
                 .postit-content {
@@ -1144,11 +1124,10 @@ Sent from VS Code Post-It Extension
                     word-wrap: break-word;
                     white-space: pre-wrap;
                 }
-                .postit-content.expanded-email {
+                .postit-content.expanded {
                     -webkit-line-clamp: unset;
                     overflow: visible;
                     max-height: none;
-                    max-width: none;
                     display: block;
                 }
                 .postit-footer {
@@ -1201,15 +1180,15 @@ Sent from VS Code Post-It Extension
                     cursor: pointer;
                     transition: background 0.2s ease;
                 }
-                .email-btn:hover, .edit-btn:hover {
+                .edit-btn:hover, .email-btn:hover {
                     background: rgba(0, 0, 0, 0.4);
                 }
                 .postit-edit {
                     margin-top: 10px;
                 }
                 .edit-textarea {
-                    min-width: 100%;
-                    min-height: 500%;
+                    width: 100%;
+                    min-height: 100px;
                     padding: 10px;
                     border: 1px solid rgba(255, 255, 255, 0.3);
                     border-radius: 4px;
@@ -1218,6 +1197,7 @@ Sent from VS Code Post-It Extension
                     font-family: 'Courier New', monospace;
                     font-size: 13px;
                     line-height: 1.4;
+                    resize: vertical;
                     outline: none;
                     box-sizing: border-box;
                 }
@@ -1417,32 +1397,32 @@ Sent from VS Code Post-It Extension
                 /**
                  * Populates all dropdowns on the page with the email list.
                  */
-                function populateAllDropdowns(emailMap) {
-                  document.querySelectorAll('.dropdown-options').forEach(dropdown => {
-                    dropdown.innerHTML = '';
-
-                    const names = Object.keys(emailMap);
-                    if (names.length > 0) {
-                      names.forEach(name => {
-                        const email = emailMap[name];
-                        const optionLabel = document.createElement('label');
-                        optionLabel.className = 'dropdown-option';
+                function populateAllDropdowns(emails) {
+                    document.querySelectorAll('.dropdown-options').forEach(dropdown => {
+                        dropdown.innerHTML = ''; // Clear "Loading..."
                         
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.value = email; // still send email
-                        optionLabel.appendChild(checkbox);
-                        optionLabel.appendChild(document.createTextNode(' ' + name)); // display name
-                        dropdown.appendChild(optionLabel);
-                      });
-                    } else {
-                      const disabledLabel = document.createElement('label');
-                      disabledLabel.className = 'dropdown-option disabled';
-                      disabledLabel.textContent = 'No contacts found.';
-                      dropdown.appendChild(disabledLabel);
-                    }
-                  });
+                        if (emails && emails.length > 0) {
+                            emails.forEach(email => {
+                                const optionLabel = document.createElement('label');
+                                optionLabel.className = 'dropdown-option';
+                                
+                                const checkbox = document.createElement('input');
+                                checkbox.type = 'checkbox';
+                                checkbox.value = email;
+                                
+                                optionLabel.appendChild(checkbox);
+                                optionLabel.appendChild(document.createTextNode(' ' + email));
+                                dropdown.appendChild(optionLabel);
+                            });
+                        } else {
+                            const disabledLabel = document.createElement('label');
+                            disabledLabel.className = 'dropdown-option disabled';
+                            disabledLabel.textContent = 'No emails found.';
+                            dropdown.appendChild(disabledLabel);
+                        }
+                    });
                 }
+
                 // --- 2. RUN THE POPULATION CODE ONCE THE PAGE IS LOADED ---
                 window.addEventListener('DOMContentLoaded', () => {
                     populateAllDropdowns(emailListFromExtension);
@@ -1469,124 +1449,61 @@ Sent from VS Code Post-It Extension
                     btn.addEventListener('click', (e) => {
                         const noteEl = e.target.closest('.postit');
                         const noteId = noteEl.getAttribute('data-id');
-
-                        // Toggle edit mode for this note
-                        if (noteEl.classList.contains('expanded-edit')) {
-                            exitEditMode(noteId);
-                        } else {
-                            enterEditMode(noteId);
-                            noteEl.classList.add('expanded-edit');
-                            noteEl.classList.remove('expanded');   
-                        }
+                        vscode.postMessage({ type: 'editNote', id: noteId });
                     });
                 });
 
-                function enterEditMode(noteId) {
-                    const noteElement = document.querySelector(\`.postit[data-id="\${noteId}"]\`);
-                    const contentDiv = document.getElementById(\`content-\${noteId}\`);
-                    const editDiv = document.getElementById(\`edit-\${noteId}\`);
-                    const textarea = document.getElementById(\`textarea-\${noteId}\`);
-
-                    // Expand and center the note
-                    noteElement.classList.add('expanded-edit');
-
-                    // Dim other notes
-                    document.querySelectorAll('.postit').forEach(otherNote => {
-                        if (otherNote !== noteElement) {
-                            otherNote.classList.add('dimmed'); // Apply dimming effect to other notes
-                        }
-                    });
-
-                    // Show the edit form
-                    contentDiv.style.display = 'none';
-                    editDiv.style.display = 'block';
-
-                    // Set the textarea content to the current content of the note
-                    textarea.value = contentDiv.textContent.trim(); // Assuming you're copying the content to the textarea
-                    textarea.focus();
-                    textarea.select();
-
-                    // Set the editing state to the current noteId
-                    editingNoteId = noteId;
-                }
-
-                // Function to exit edit mode
-                function exitEditMode(noteId) {
-                    const noteElement = document.querySelector(\`.postit[data-id="\${noteId}"]\`);
-                    const contentDiv = document.getElementById(\`content-\${noteId}\`);
-                    const editDiv = document.getElementById(\`edit-\${noteId}\`);
-
-                    if (!noteElement) return;
-
-                    // Revert to normal state
-                    noteElement.classList.remove('expanded', 'expanded-edit');
-                    noteElement.style.position = '';
-                    noteElement.style.top = '';
-                    noteElement.style.left = '';
-                    noteElement.style.transform = '';
-                    noteElement.style.width = '';
-                    noteElement.style.height = '';
-                    noteElement.style.zIndex = '';
-                    noteElement.style.transition = '';
-
-                    // Remove dimming from other notes
-                    document.querySelectorAll('.postit').forEach(otherNote => {
-                        otherNote.classList.remove('dimmed');
-                    });
-
-                    // Show the content and hide the edit form
-                    if (contentDiv && editDiv) {
-                        contentDiv.style.display = 'block';
-                        editDiv.style.display = 'none';
-                    }
-
-                    // Remove global expanded-mode lock
-                    document.body.classList.remove('expanded-mode');
-
-                    editingNoteId = null;
-                }
-
-
                 document.querySelectorAll('.email-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
-                      const noteId = e.target.getAttribute('data-id');
-                      const noteElement = document.querySelector(\`.postit[data-id="\${noteId}"]\`);
-                      const contentDiv = document.getElementById(\`content-\${noteId}\`);
-                      const emailDiv = document.getElementById(\`email-\${noteId}\`);
-                      const userInput = document.getElementById(\`userInput-\${noteId}\`);
+                        const noteId = e.target.getAttribute('data-id');
+                        vscode.postMessage({ type: 'toggleEmailMode', noteId: noteId });
+                    });
+                });
 
-                      // Prevent expanding the note for email mode
-                      noteElement.classList.add('expanded-email');  // Use email-specific expanded class
-                      noteElement.classList.remove('expanded-edit'); // Remove edit-specific expanded class
-
-                      contentDiv.style.display = 'none';
-                      emailDiv.style.display = 'block';
-                      userInput.focus();
-                  });
+                document.querySelectorAll('.expand-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const noteId = e.target.getAttribute('data-id');
+                        const noteElement = e.target.closest('.postit');
+                        const content = document.getElementById('content-' + noteId);
+                        const expandBtn = e.target;
+                        
+                        if (noteElement.classList.contains('expanded')) {
+                            noteElement.classList.remove('expanded');
+                            content.classList.remove('expanded');
+                            expandBtn.textContent = '▼';
+                            expandBtn.classList.remove('expanded');
+                        } else {
+                            noteElement.classList.add('expanded');
+                            content.classList.add('expanded');
+                            expandBtn.textContent = '▲';
+                            expandBtn.classList.add('expanded');
+                        }
+                    });
                 });
 
                 document.querySelectorAll('.save-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         const noteId = e.target.getAttribute('data-id');
-                        const textarea = document.getElementById(\`textarea-\${noteId}\`);
+                        const textarea = document.getElementById('textarea-' + noteId);
                         const content = textarea.value;
-                        
-                        // Post save event
                         vscode.postMessage({ 
                             type: 'saveNoteEdit', 
                             noteId: noteId, 
                             content: content 
                         });
-
-                        // Exit edit mode after save
-                        exitEditMode(noteId);
                     });
                 });
 
                 document.querySelectorAll('.cancel-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         const noteId = e.target.getAttribute('data-id');
-                        exitEditMode(noteId);
+                        vscode.postMessage({ 
+                            type: 'cancelEdit', 
+                            noteId: noteId 
+                        });
                     });
                 });
 
@@ -1656,59 +1573,30 @@ Sent from VS Code Post-It Extension
                 });
 
                 document.body.addEventListener('change', (e) => {
-                  if (e.target.type === 'checkbox' && e.target.closest('.dropdown-options')) {
-                    const container = e.target.closest('.multiselect-container');
-                    const noteId = container.dataset.noteId;
-                    const placeholder = document.getElementById(\`recipientPlaceholder-\${noteId}\`);
-                    const checkedInputs = container.querySelectorAll('input[type="checkbox"]:checked');
-                    const names = Array.from(checkedInputs).map(c => c.parentNode.textContent.trim());
-                    
-                    // Helper to measure text width
-                    function getTextWidth(text, font) {
-                      const canvas = document.createElement('canvas');
-                      const context = canvas.getContext('2d');
-                      context.font = font || getComputedStyle(placeholder).font;
-                      return context.measureText(text).width;
-                    }
-
-                    if (names.length === 0) {
-                      placeholder.textContent = 'Select recipients...';
-                      placeholder.classList.add('placeholder-text');
-                      return;
-                    }
-
-                    placeholder.classList.remove('placeholder-text');
-                    const font = getComputedStyle(placeholder).font;
-                    const boxWidth = placeholder.closest('.select-box').clientWidth - 20;
-                    let displayText = '';
-
-                    if (names.length > 2) {
-                      displayText = names.slice(0, names.length - 1).join(', ') + ', and ' + names[names.length - 1];
-                    } else if (names.length === 2) {
-                      displayText = names.join(' and ');
-                    } else {
-                      displayText = names[0];
-                    }
-
-                    // If the text is too long, shorten it
-                    if (getTextWidth(displayText, font) > boxWidth) {
-                      let shownNames = [];
-                      for (let i = 0; i < names.length; i++) {
-                        const testText = shownNames.concat(names[i]).join(', ') + ', and ' + (names.length - i - 1) + ' others';
-                        if (getTextWidth(testText, font) > boxWidth) {
-                          displayText = shownNames.join(', ') + ', and ' + (names.length - i) + ' others';
-                          break;
+                    if (e.target.type === 'checkbox' && e.target.closest('.dropdown-options')) {
+                        const container = e.target.closest('.multiselect-container');
+        
+                        // 1. Get the note's ID from the container
+                        const noteId = container.dataset.noteId;
+        
+                        // 2. Find the placeholder by its unique ID, not its class
+                        const placeholder = document.getElementById(\`recipientPlaceholder-\${noteId}\`);
+                        
+                        // 3. Find the checkboxes
+                        const checkedInputs = container.querySelectorAll('input[type="checkbox"]:checked');
+                        
+                        // 4. This logic is now safe because 'placeholder' will always be found
+                        if (checkedInputs.length === 0) {
+                            placeholder.textContent = 'Select recipients...';
+                            placeholder.classList.add('placeholder-text');
+                        } else if (checkedInputs.length === 1) {
+                            placeholder.textContent = checkedInputs[0].value;
+                            placeholder.classList.remove('placeholder-text');
+                        } else {
+                            placeholder.textContent = \`\${checkedInputs.length} recipients selected\`;
+                            placeholder.classList.remove('placeholder-text');
                         }
-                        shownNames.push(names[i]);
-                      }
                     }
-
-                    if (displayText.charAt(0) === ',') {
-                      displayText = \`\${names.length} selected\`;
-                    }
-
-                    placeholder.textContent = displayText;
-                  }
                 });
 
                 // --- 3. MESSAGE LISTENER NO LONGER NEEDS 'loadEmails' ---
@@ -1766,18 +1654,6 @@ Sent from VS Code Post-It Extension
                         contentDiv.style.display = 'block';
                         emailDiv.style.display = 'none';
                         noteElement.classList.remove('expanded');
-                    }
-                });
-                document.addEventListener('keydown', (event) => {
-                    if (event.key === 'Escape') {
-                        // Find the currently expanded note, if any
-                        const expandedNote = document.querySelector('.postit.expanded-edit');
-                        if (expandedNote) {
-                            const noteId = expandedNote.getAttribute('data-id');
-                            if (noteId) {
-                                exitEditMode(noteId);
-                            }
-                        }
                     }
                 });
             </script>
