@@ -1,10 +1,9 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
-const path = require('path');
 // Import the highlighter functionality from the new file
 //const { activateHighlighter } = require('./src/highlight.js');
-const { createTicketFromEmailData } = require('./src/create-ticket.js');
+const { sendEmail } = require('./src/send-email.js');
 const { NoteManager } = require('./PostIt/noteManager');
 const { EmailUIManager } = require('./PostIt/emailUIManager');
 
