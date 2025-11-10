@@ -54,8 +54,8 @@
         "title": "Clear Stored Email"
       },
       {
-        "command":"visualizer.start",
-        "title":"Start Code Visualizer"
+        "command": "visualizer.start",
+        "title": "Start Code Visualizer"
       }
     ],
     "menus": {
@@ -69,11 +69,11 @@
           "when": "editorHasSelection"
         }
       ],
-      "editor/title":[
+      "editor/title": [
         {
-          "command":"visualizer.start",
-          "when":"editorLangId == python",
-          "group":"navigation"
+          "command": "visualizer.start",
+          "when": "editorLangId == python",
+          "group": "navigation"
         }
       ]
     }
@@ -92,8 +92,8 @@
     "eslint": "^9.34.0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
-    "dotenv": "^17.2.2",
+    "@supabase/supabase-js": "^2.81.0",
+    "dotenv": "^17.2.3",
     "nodemailer": "^7.0.6"
   }
 }

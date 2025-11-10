@@ -8,6 +8,7 @@ const { sendEmail } = require('./src/send-email.js');
 const { createTicketFromEmailData } = require('./src/create-ticket.js');
 const { NoteManager } = require('./PostIt/noteManager');
 const { EmailUIManager } = require('./PostIt/emailUIManager');
+const {supabase} = require('./src/supabaseClient.js');
 
 const visualizer = require('./src/visualizer.js');
 const EMAIL_KEY = 'myExtension.userEmail';
@@ -37,6 +38,8 @@ function activate(context) {
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "test" is now active!');
+
+
 	vscode.window.showInformationMessage('This extension is now active!');
 	
 	// Create status bar item for notes
