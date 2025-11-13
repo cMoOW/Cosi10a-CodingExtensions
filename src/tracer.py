@@ -87,52 +87,73 @@ def tracer(frame, event, arg):
     
     return tracer
 
-# --- Main script execution (Unchanged, but uses new tracer) ---
 if __name__ == "__main__":
     #global main_filename
 
-    if len(sys.argv) < 2:
-        print("Error: No script file provided.", file=sys.stderr)
-        sys.exit(1)
-        
-    script_to_run = sys.argv[1]
+    # --- NEW: Define exit codes ---
+    EXIT_CODE_SUCCESS = 0
+    EXIT_CODE_RUNTIME_ERROR = 1
+    EXIT_CODE_SYNTAX_ERROR = 2
+    # -----------------------------
+
+    if len(sys.argv) < 3:
+        print("Error: Missing args.", file=sys.stderr)
+        sys.exit(EXIT_CODE_RUNTIME_ERROR) 
     
+    input_data_str = sys.argv[1]
+    script_to_run = sys.argv[2] 
+    script_content = sys.stdin.read()
+
+    # --- Setup stdout/stdin redirection ---
     original_stdout = sys.stdout
     sys.stdout = redirected_stdout
     original_stdin = sys.stdin
     
-    if len(sys.argv) > 2 and sys.argv[2]:
-        input_data = sys.argv[2].replace("\\n", "\n")
+    if input_data_str:
+        input_data = input_data_str.replace("\\n", "\n")
         sys.stdin = io.StringIO(input_data)
     else:
         sys.stdin = MockStdin()
     
+    scope = {}
+    
+    # We must restore stdio *after* the run, so we need one big try/finally
     try:
-        with open(script_to_run, 'r') as f:
-            script_content = f.read()
-
-        main_code_object = compile(script_content, script_to_run, 'exec')
-        
-        # Store the normalized, absolute path of the script.
+        try:
+            # --- 1. Try to compile ---
+            main_code_object = compile(script_content, script_to_run, 'exec')
+        except (SyntaxError, IndentationError, TabError) as e:
+            # --- Compile-time error ---
+            # Print error so VS Code can see it, but exit with a special code
+            print(f"Syntax Error: {e}", file=sys.stderr)
+            sys.exit(EXIT_CODE_SYNTAX_ERROR)
+            
+        # --- 2. Try to execute ---
         main_filename = os.path.normcase(os.path.abspath(main_code_object.co_filename))
-        
         sys.settrace(tracer)
-        scope = {}
         exec(main_code_object, scope, scope)
-
+        
     except Exception as e:
+        # --- Runtime error (e.g., NameError) ---
         sys.stdout = original_stdout 
         sys.stdin = original_stdin 
         print(f"Error during script execution: {e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_CODE_RUNTIME_ERROR)
         
     finally:
+        # --- 3. Cleanup (always runs) ---
         sys.settrace(None)
+        # Restore original stdio
         sys.stdout = original_stdout
         sys.stdin = original_stdin 
+    
+    # --- 4. Success Case ---
+    # We only get here if no exceptions were raised.
+    final_output = redirected_stdout.getvalue()
+    if execution_trace:
+        final_vars = safe_serialize(scope)
+        execution_trace[-1]['output'] += final_output
+        execution_trace[-1]['local_vars'] = final_vars
         
-        final_output = redirected_stdout.getvalue()
-        if final_output and execution_trace:
-            execution_trace[-1]['output'] += final_output
-
     print(json.dumps(execution_trace, indent=2))
+    sys.exit(EXIT_CODE_SUCCESS) # Explicit success exit

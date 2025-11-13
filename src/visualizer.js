@@ -74,7 +74,7 @@ function onDocumentChange(event) { // <-- No 'context' parameter
     debounceTimer = setTimeout(() => {
         associatedDocument = event.document;
         runTracerAndPostUpdate(); // <-- No 'context' parameter
-    }, 750);
+    }, 500);
 }
 
 /**
@@ -100,7 +100,7 @@ function runTracerAndPostUpdate() { // <-- No 'context' parameter
 
     const tracerProcess = spawn(
         pythonCommand,
-        [tracerPath, scriptPath, allInputs],
+        [tracerPath, allInputs, scriptPath], // Pass scriptPath as argv[2]
         { cwd: scriptDir }
     );
 
@@ -115,20 +115,18 @@ function runTracerAndPostUpdate() { // <-- No 'context' parameter
         errorData += data.toString();
     });
 
+    // --- THIS IS THE UPDATED LOGIC ---
     tracerProcess.on('close', (code) => {
         if (!visualizerPanel) {
             return; 
         }
 
-        if (code !== 0) {
-            visualizerPanel.webview.postMessage({
-                command: 'updateTrace',
-                sourceCode: sourceCode,
-                traceData: "[]",
-                errorData: errorData,
-                currentInputs: allInputs
-            });
-        } else {
+        const EXIT_CODE_SUCCESS = 0;
+        const EXIT_CODE_RUNTIME_ERROR = 1;
+        const EXIT_CODE_SYNTAX_ERROR = 2;
+
+        if (code === EXIT_CODE_SUCCESS) {
+            // Succeeded: Post the full update
             visualizerPanel.webview.postMessage({
                 command: 'updateTrace',
                 sourceCode: sourceCode,
@@ -136,8 +134,34 @@ function runTracerAndPostUpdate() { // <-- No 'context' parameter
                 errorData: null,
                 currentInputs: allInputs
             });
+        } else if (code === EXIT_CODE_RUNTIME_ERROR) {
+            // Failed with a *real* runtime error: Post the error
+            visualizerPanel.webview.postMessage({
+                command: 'updateTrace',
+                sourceCode: sourceCode,
+                traceData: "[]",
+                errorData: errorData, // Show the error
+                currentInputs: allInputs
+            });
+        } else if (code === EXIT_CODE_SYNTAX_ERROR) {
+            // Failed with a syntax error (user is typing):
+            // --- DO NOTHING ---
+            // Just hide the loading fade, but don't update.
+            // The UI will stay on the last good state.
+            visualizerPanel.webview.postMessage({ command: 'hideLoading' });
+        } else {
+            // Unexpected error code
+            visualizerPanel.webview.postMessage({
+                command: 'updateTrace',
+                sourceCode: sourceCode,
+                traceData: "[]",
+                errorData: `Tracer exited with unexpected code ${code}: ${errorData}`,
+                currentInputs: allInputs
+            });
         }
     });
+    tracerProcess.stdin.write(sourceCode);
+    tracerProcess.stdin.end();
 }
 
 /**
