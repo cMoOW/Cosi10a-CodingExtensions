@@ -1,9 +1,10 @@
 import React from 'react';
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient.js";
-import { relative } from 'path';
+import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [noteCount, setNoteCount] = useState(0);
 
   useEffect(() => {
@@ -51,9 +52,9 @@ export default function Dashboard() {
       {/* Top-right button */}
       <button 
         // @ts-ignore
-        style={styles.topRightButton}
+        style={styles.button}
         // @ts-ignore
-        onClick={() => navigate("/notes")}
+        onClick={() => navigate("/tickets")}
       >
         View All Notes
       </button>
@@ -74,7 +75,9 @@ export default function Dashboard() {
 
 const styles = {
   dashboard: {
-    position: relative,
+    position: "relative",
+    width: "100%",
+    height: "100%",
     display: "flex",
     flexDirection: "column",
     gap: "2rem",
