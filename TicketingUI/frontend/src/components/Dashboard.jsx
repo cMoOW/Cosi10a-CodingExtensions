@@ -1,6 +1,7 @@
 import React from 'react';
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient.js";
+import { relative } from 'path';
 
 export default function Dashboard() {
   const [noteCount, setNoteCount] = useState(0);
@@ -46,24 +47,51 @@ export default function Dashboard() {
     <div 
 // @ts-ignore
     style={styles.dashboard}>
+      
+      {/* Top-right button */}
+      <button 
+        // @ts-ignore
+        style={styles.topRightButton}
+        // @ts-ignore
+        onClick={() => navigate("/notes")}
+      >
+        View All Notes
+      </button>
+  
+      <h1 style={styles.title}>Ticketing Dashboard</h1>
+    
       <div 
 // @ts-ignore
       style={styles.card}>
         <h3 style={styles.cardTitle}>Total Notes</h3>
         <p style={styles.cardCount}>{noteCount}</p>
       </div>
+  
     </div>
   );
+  
 }
 
 const styles = {
   dashboard: {
+    position: relative,
+    display: "flex",
+    flexDirection: "column",
+    gap: "2rem",
+    padding: "2rem",
+    minHeight: "100vh",
+  },
+  headerRow: {
     display: "flex",
     flexDirection: "row",
-    justifyContent: "flex-start",
-    alignItems: "flex-start",
-    gap: "1rem",
-    padding: "1rem",
+    justifyContent: "space-between", 
+    alignItems: "center",
+    width: "100%",
+  },
+  title: {
+    margin: 0,
+    fontSize: "2rem",
+    fontWeight: "bold",
   },
   card: {
     backgroundColor: "white",
@@ -85,4 +113,25 @@ const styles = {
     color: "#4f46e5",
     marginTop: "0.5rem",
   },
+  button: {
+    padding: "0.75rem 1.5rem",
+    fontSize: "1rem",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#4f46e5",
+    color: "white",
+    cursor: "pointer",
+  },
+  topRightButton: {
+    position: "absolute",
+    top: "1.5rem",
+    right: "2rem",
+    padding: "0.75rem 1.5rem",
+    fontSize: "1rem",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#4f46e5",
+    color: "white",
+    cursor: "pointer",
+  },  
 };
