@@ -7,16 +7,39 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchNoteCount();
+
+    const channel = supabase
+    .channel("realtime:notes")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "tickets" },
+      (payload) => {
+        console.log("New note added:", payload.new);
+        setNoteCount((prev) => prev + 1);
+      }
+    )
+    .subscribe((status) => {
+      console.log("Supabase Realtime subscription status:", status);
+    });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   async function fetchNoteCount() {
     const { count, error } = await supabase
-      .from("notes")
-      .select("*", { count: "exact", head: true });
+      .from("tickets")
+      .select("*", { count: "exact", head: true }); // only get count, no data
 
-    if (!error && count !== null) {
-      setNoteCount(count);
-    }
+
+      if (error) {
+        console.error("Error inserting note:", error);
+      }
+      else {
+        console.log("Inserted ticket:", count);
+        setNoteCount(count);
+      }
   }
 
   return (

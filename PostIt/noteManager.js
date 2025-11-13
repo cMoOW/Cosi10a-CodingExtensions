@@ -1,6 +1,13 @@
+const { supabase } = require("../src/supabaseClient");
 const vscode = require("vscode");
 const fs = require("fs");
 const path = require("path");
+
+function numberToUuid(num) {
+  const hex = num.toString(16).padStart(32, "0"); // pad to 32 hex chars
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+
+}
 
 class NoteManager {
   constructor(context, onNotesChanged = null) {
@@ -446,6 +453,21 @@ Sent from VS Code Post-It Extension
    */
   async saveNotes() {
     try {
+    const latestNote = this.notes[this.notes.length - 1];
+      if(latestNote){
+        const uuidId = numberToUuid(latestNote.id);
+        const { error } = await supabase.from("tickets").insert([
+          {
+            //TODO: need to add more fields later and make them not static
+            id: uuidId,
+            student_email: "auppal@brandeis.edu", 
+            message: "blah"
+          },
+        ]);
+        if (error) console.error("Error inserting note to Supabase:", error);
+        else console.log("Note synced to Supabase!");
+
+            
       // Ensure directory exists
       const dir = path.dirname(this.notesFilePath);
       if (!fs.existsSync(dir)) {
@@ -461,9 +483,14 @@ Sent from VS Code Post-It Extension
 
       // Notify that notes have changed
       this.notifyNotesChanged();
-    } catch (error) {
-      console.error("Error saving notes:", error);
+      }
+    } catch (err) {
+      console.error("Failed to sync note to Supabase:", err);
     }
+
+    // } catch (error) {
+    //   console.error("Error saving notes:", error);
+    // }
   }
 
   /**
