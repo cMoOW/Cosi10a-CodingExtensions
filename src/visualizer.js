@@ -33,9 +33,12 @@ function createOrShowPanel() { // <-- No 'context' parameter
     // Store state
     associatedDocument = editor.document;
     currentInput = ""; 
-    
-    // Load the initial HTML shell
-    visualizerPanel.webview.html = getVisualizerHTML(editor.document.getText(), "[]", "", null);
+    // --- THIS IS THE CHANGE ---
+    const sourceCode = editor.document.getText();
+    const showInputBox = checkCodeForInput(sourceCode);
+
+    // Load the initial HTML shell, passing the new boolean
+    visualizerPanel.webview.html = getVisualizerHTML(sourceCode, "[]", "", null, showInputBox);
 
     // Listen for messages FROM the Webview
     visualizerPanel.webview.onDidReceiveMessage(
@@ -60,6 +63,28 @@ function createOrShowPanel() { // <-- No 'context' parameter
 
     // Run the *first* trace AFTER loading the shell
     runTracerAndPostUpdate(); // <-- No 'context' parameter
+}
+
+// --- NEW: Helper function to check for input() ---
+/**
+ * Scans the code line-by-line to see if 'input()' is
+ * present and *not* inside a comment.
+ * @param {string} sourceCode
+ */
+function checkCodeForInput(sourceCode) {
+    const lines = sourceCode.split('\n');
+    const inputRegex = /\binput\s*\(/; // Looks for "input("
+    const commentRegex = /^\s*#/; // Looks for a line starting with #
+    
+    for (const line of lines) {
+        // If the line is NOT a comment AND it contains "input("...
+        if (!commentRegex.test(line) && inputRegex.test(line)) {
+            // We found it!
+            return true;
+        }
+    }
+    // We went through the whole file and didn't find it
+    return false;
 }
 
 /**
@@ -94,10 +119,10 @@ function runTracerAndPostUpdate() { // <-- No 'context' parameter
     const scriptPath = document.fileName;
     const scriptDir = path.dirname(scriptPath);
     const sourceCode = document.getText();
-    // --- FIX: Read 'extensionContext' from module scope ---
+
     const tracerPath = path.join(extensionContext.extensionPath, 'src/tracer.py');
     const pythonCommand = 'python3';
-
+    const showInputBox = checkCodeForInput(sourceCode);
     const tracerProcess = spawn(
         pythonCommand,
         [tracerPath, allInputs, scriptPath], // Pass scriptPath as argv[2]
@@ -126,37 +151,33 @@ function runTracerAndPostUpdate() { // <-- No 'context' parameter
         const EXIT_CODE_SYNTAX_ERROR = 2;
 
         if (code === EXIT_CODE_SUCCESS) {
-            // Succeeded: Post the full update
             visualizerPanel.webview.postMessage({
                 command: 'updateTrace',
                 sourceCode: sourceCode,
                 traceData: traceDataJson,
                 errorData: null,
-                currentInputs: allInputs
+                currentInputs: allInputs,
+                showInputBox: showInputBox
             });
         } else if (code === EXIT_CODE_RUNTIME_ERROR) {
-            // Failed with a *real* runtime error: Post the error
             visualizerPanel.webview.postMessage({
                 command: 'updateTrace',
                 sourceCode: sourceCode,
                 traceData: "[]",
-                errorData: errorData, // Show the error
-                currentInputs: allInputs
+                errorData: errorData,
+                currentInputs: allInputs,
+                showInputBox: showInputBox
             });
         } else if (code === EXIT_CODE_SYNTAX_ERROR) {
-            // Failed with a syntax error (user is typing):
-            // --- DO NOTHING ---
-            // Just hide the loading fade, but don't update.
-            // The UI will stay on the last good state.
             visualizerPanel.webview.postMessage({ command: 'hideLoading' });
         } else {
-            // Unexpected error code
             visualizerPanel.webview.postMessage({
                 command: 'updateTrace',
                 sourceCode: sourceCode,
                 traceData: "[]",
                 errorData: `Tracer exited with unexpected code ${code}: ${errorData}`,
-                currentInputs: allInputs
+                currentInputs: allInputs,
+                showInputBox: showInputBox
             });
         }
     });
@@ -181,22 +202,43 @@ function activate(context) {
     let changeListener = vscode.workspace.onDidChangeTextDocument(
         onDocumentChange // No need to pass context
     );
+    // --- NEW: Register the "tab change" listener ---
+    let tabChangeListener = vscode.window.onDidChangeActiveTextEditor(editor => {
+        // Check 1: Is our panel open?
+        if (!visualizerPanel) {
+            return;
+        }
 
-    context.subscriptions.push(startCommand, changeListener);
+        // Check 2: Is the new editor valid and a Python file?
+        if (editor && editor.document.languageId === 'python') {
+            
+            // Check 3: Is it a *new* file (not the one we're already watching)?
+            if (editor.document.uri !== associatedDocument.uri) {
+                // It's a new Python file!
+                // Update our state to follow it
+                associatedDocument = editor.document;
+                currentInput = ""; // Reset input for the new file
+
+                // Run the tracer on this new file
+                runTracerAndPostUpdate();
+            }
+        }
+        // If it's not a Python file (e.g., package.json), we do nothing.
+        // The visualizer remains associated with the *previous* Python file.
+    });
+    context.subscriptions.push(startCommand, changeListener, tabChangeListener);
 }
 
 /**
  * Generates the full HTML/CSS/JS "shell" for the Webview.
- * This version uses a fade-out/fade-in for updates instead of a full overlay.
- *
- * @param {string} sourceCode - The Python source code.
- * @param {string} traceData - The JSON string of the execution trace ("[]" if error).
- * @param {string} currentInputs - The input string that was used for this run.
- * @param {string | null} errorData - The error message, if any.
+ * @param {string} sourceCode
+ * @param {string} traceData
+ * @param {string} currentInputs
+ * @param {string | null} errorData
+ * @param {boolean} initialShowInputBox
  */
-function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
+function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, initialShowInputBox) {
     
-    // Safely embed all the data into the HTML
     const safeSourceCode = JSON.stringify(sourceCode);
     const safeErrorData = JSON.stringify(errorData || null);
     
@@ -218,8 +260,6 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                     background-color: var(--vscode-editor-background);
                 }
                 h4 { margin-top: 0; }
-                
-                /* --- Error Display --- */
                 #errorDisplay {
                     padding: 10px;
                     background-color: #5c2121;
@@ -227,11 +267,11 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                 }
                 #errorDisplay h4 { margin: 0 0 5px 0; color: #ffcccc; }
                 #errorDisplay pre { white-space: pre-wrap; color: white; margin: 0; }
-
-                /* --- Input Area --- */
+                
                 #inputArea {
                     padding: 10px;
                     border-bottom: 1px solid var(--vscode-sideBar-border, #333);
+                    display: none; /* Hidden by default */
                 }
                 #inputArea h4 { margin: 0 0 5px 0; }
                 #inputBox {
@@ -242,8 +282,6 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                     border: 1px solid var(--vscode-input-border);
                 }
                 #rerunBtn { margin-top: 5px; background-color: #098309; }
-
-                /* --- Controls --- */
                 #controls { 
                     padding: 10px; 
                     border-bottom: 1px solid var(--vscode-sideBar-border, #333); 
@@ -262,8 +300,6 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                 }
                 button:disabled { background-color: #555; }
                 #stepSlider { flex-grow: 1; margin: 0 10px; }
-
-                /* --- Main Layout --- */
                 #main { 
                     display: flex; 
                     flex: 1; 
@@ -299,9 +335,6 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                 .highlight-line { 
                     background-color: var(--vscode-editor-selectionBackground, rgba(255, 255, 0, 0.3)); 
                 }
-
-                /* --- NEW: Seamless Loading Style --- */
-                /* When loading, we'll just fade the main content */
                 body.loading #main,
                 body.loading #controls {
                     opacity: 0.5;
@@ -311,7 +344,7 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
         <body>
             <div id="errorDisplay"></div>
 
-            <div id="inputArea">
+            <div id="inputArea" style="display: ${initialShowInputBox ? 'block' : 'none'}">
                 <h4>Program Input (one per line)</h4>
                 <textarea id="inputBox" rows="3"></textarea>
                 <button id="rerunBtn">Re-run Visualization</button>
@@ -338,14 +371,14 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
             <script>
                 const vscode = acquireVsCodeApi();
                 
-                // --- Global State (will be updated by messages) ---
                 let sourceCode = ${safeSourceCode};
-                let trace = ${traceData}; // This is a JS object (from "[]")
+                let trace = ${traceData};
                 let errorData = ${safeErrorData};
+                let showInputBox = ${initialShowInputBox};
                 let currentIndex = -1;
                 let codeLines = sourceCode.split('\\n');
 
-                // --- Get All DOM Elements ---
+                const inputArea = document.getElementById('inputArea');
                 const errorDisplay = document.getElementById('errorDisplay');
                 const inputBox = document.getElementById('inputBox');
                 const rerunBtn = document.getElementById('rerunBtn');
@@ -357,9 +390,7 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                 const varsDisplay = document.getElementById('varsDisplay');
                 const outputContent = document.getElementById('outputContent');
                 
-                // --- Main Render Function (unchanged) ---
                 function render() {
-                    // 1. Update Buttons, Label, Slider
                     prevBtn.disabled = (currentIndex <= 0);
                     nextBtn.disabled = (currentIndex >= trace.length - 1);
                     stepLabel.textContent = \`Step: \${currentIndex + 1} / \${trace.length}\`;
@@ -368,8 +399,6 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                     
                     const step = trace[currentIndex];
                     const currentLine = step.line_no;
-
-                    // 2. Render Code + Highlight
                     let codeHtml = '';
                     for (let i = 0; i < codeLines.length; i++) {
                         const lineClass = (i + 1 === currentLine) ? 'highlight-line' : '';
@@ -377,13 +406,9 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                         codeHtml += \`<div class="\${lineClass}">\${lineText || '&nbsp;'}</div>\`;
                     }
                     codeDisplay.innerHTML = codeHtml;
-
-                    // 3. Render Variables
                     let varsHtml = '<h4>Local Variables</h4>';
                     varsHtml += JSON.stringify(step.local_vars, null, 2);
                     varsDisplay.innerHTML = varsHtml;
-                    
-                    // 4. Render Cumulative Output
                     let cumulativeOutput = '';
                     for (let i = 0; i <= currentIndex; i++) {
                         if (trace[i].output) {
@@ -393,20 +418,17 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                     outputContent.textContent = cumulativeOutput;
                 }
 
-                // --- Main function to update UI with new data ---
-                function updateUI(newSourceCode, newTraceData, newErrorData, newInputs) {
-                    // 1. Update global state
+                function updateUI(newSourceCode, newTraceData, newErrorData, newInputs, newShowInputBox) {
                     sourceCode = newSourceCode;
-                    trace = JSON.parse(newTraceData); // newTraceData is a JSON string
+                    trace = JSON.parse(newTraceData);
                     errorData = newErrorData;
                     codeLines = sourceCode.split('\\n');
                     
-                    // 2. Update Input Box (but only if it's not focused)
+                    inputArea.style.display = newShowInputBox ? 'block' : 'none';
+
                     if (document.activeElement !== inputBox) {
                         inputBox.value = newInputs.replace(/\\n/g, '\\n');
                     }
-
-                    // 3. Update Error Display
                     if (errorData) {
                         errorDisplay.innerHTML = \`
                             <h4>Tracer Failed (check inputs or code):</h4>
@@ -417,7 +439,6 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                         errorDisplay.style.display = 'none';
                     }
                     
-                    // 4. Reset controls and render
                     if (trace.length > 0) {
                         stepSlider.max = trace.length - 1;
                         stepSlider.disabled = false;
@@ -434,62 +455,49 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData) {
                     }
                 }
                 
-                // --- Listen for messages from the extension ---
                 window.addEventListener('message', event => {
                     const message = event.data;
-                    
                     switch (message.command) {
                         case 'showLoading':
-                            // --- MODIFIED ---
                             document.body.classList.add('loading');
                             break;
-                        
+                        case 'hideLoading':
+                            document.body.classList.remove('loading');
+                            break;
                         case 'updateTrace':
-                            // --- MODIFIED ---
                             document.body.classList.remove('loading');
                             updateUI(
                                 message.sourceCode,
-                                message.traceData, // This is a JSON string
+                                message.traceData,
                                 message.errorData,
-                                message.currentInputs
+                                message.currentInputs,
+                                message.showInputBox
                             );
                             break;
                     }
                 });
 
-                // --- Event Listeners (Button clicks) ---
                 prevBtn.onclick = () => {
-                    if (currentIndex > 0) {
-                        currentIndex--;
-                        render();
-                    }
+                    if (currentIndex > 0) { currentIndex--; render(); }
                 };
-                
                 nextBtn.onclick = () => {
-                    if (currentIndex < trace.length - 1) {
-                        currentIndex++;
-                        render();
-                    }
+                    if (currentIndex < trace.length - 1) { currentIndex++; render(); }
                 };
-
                 stepSlider.oninput = () => {
                     currentIndex = parseInt(stepSlider.value, 10);
                     render();
                 };
-                
                 rerunBtn.onclick = () => {
                     const inputText = inputBox.value;
                     const safeInput = inputText.replace(/\\n/g, '\\\\n').replace(/\\n/g, '\\\\n');
-                    
                     vscode.postMessage({
                         command: 'rerun',
                         text: safeInput
                     });
                 };
 
-                // --- Initial Render ---
-                // (This runs once when the HTML is first loaded)
-                updateUI(sourceCode, JSON.stringify(trace), errorData, "${currentInputs}");
+                // Initial Render
+                updateUI(sourceCode, JSON.stringify(trace), errorData, "${currentInputs}", showInputBox);
             </script>
         </body>
         </html>
