@@ -339,24 +339,50 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                 body.loading #controls {
                     opacity: 0.5;
                 }
+
+                /* --- Variable Table Styles --- */
+                #varsTable {
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed; /* Keeps columns from resizing wildly */
+                }
+                #varsTable th {
+                    text-align: left;
+                    padding: 4px 8px;
+                    border-bottom: 2px solid var(--vscode-sideBar-border, #333);
+                }
+                #varsTable td {
+                    padding: 4px 8px;
+                    border-bottom: 1px solid var(--vscode-sideBar-border, #333);
+                    vertical-align: top;
+                    /* Allow long values to wrap */
+                    word-wrap: break-word;
+                    white-space: pre-wrap;
+                }
+                #varsTable td:first-child {
+                    /* Variable name column */
+                    width: 35%;
+                    font-weight: bold;
+                }
+                #varsTable tr:last-child td {
+                    border-bottom: none;
+                }
+
             </style>
         </head>
         <body>
             <div id="errorDisplay"></div>
-
             <div id="inputArea" style="display: ${initialShowInputBox ? 'block' : 'none'}">
                 <h4>Program Input (one per line)</h4>
                 <textarea id="inputBox" rows="3"></textarea>
                 <button id="rerunBtn">Re-run Visualization</button>
             </div>
-
             <div id="controls">
                 <button id="prevBtn">« Prev</button>
                 <input type="range" id="stepSlider" value="0" min="0" max="0" />
                 <button id="nextBtn">Next »</button>
                 <span id="stepLabel">Step: 0 / 0</span>
             </div>
-            
             <div id="main">
                 <div id="codeDisplay"></div>
                 <div id="sidebar">
@@ -391,6 +417,7 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                 const outputContent = document.getElementById('outputContent');
                 
                 function render() {
+                    // 1. Update Buttons, Label, Slider
                     prevBtn.disabled = (currentIndex <= 0);
                     nextBtn.disabled = (currentIndex >= trace.length - 1);
                     stepLabel.textContent = \`Step: \${currentIndex + 1} / \${trace.length}\`;
@@ -399,6 +426,8 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                     
                     const step = trace[currentIndex];
                     const currentLine = step.line_no;
+
+                    // 2. Render Code + Highlight
                     let codeHtml = '';
                     for (let i = 0; i < codeLines.length; i++) {
                         const lineClass = (i + 1 === currentLine) ? 'highlight-line' : '';
@@ -406,9 +435,27 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                         codeHtml += \`<div class="\${lineClass}">\${lineText || '&nbsp;'}</div>\`;
                     }
                     codeDisplay.innerHTML = codeHtml;
+                    
+                    // 3. Render Variables as a Table
                     let varsHtml = '<h4>Local Variables</h4>';
-                    varsHtml += JSON.stringify(step.local_vars, null, 2);
+                    const localVars = step.local_vars;
+
+                    if (Object.keys(localVars).length > 0) {
+                        varsHtml += '<table id="varsTable"><thead><tr><th>Variable</th><th>Value</th></tr></thead><tbody>';
+                        for (const key in localVars) {
+                            const value = localVars[key];
+                            const safeKey = key.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                            const safeValue = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                            
+                            varsHtml += \`<tr><td>\${safeKey}</td><td>\${safeValue}</td></tr>\`;
+                        }
+                        varsHtml += '</tbody></table>';
+                    } else {
+                        varsHtml += '<span>No local variables in this step.</span>';
+                    }
                     varsDisplay.innerHTML = varsHtml;
+                    
+                    // 4. Render Cumulative Output
                     let cumulativeOutput = '';
                     for (let i = 0; i <= currentIndex; i++) {
                         if (trace[i].output) {
