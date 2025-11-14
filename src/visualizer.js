@@ -38,7 +38,7 @@ function createOrShowPanel() { // <-- No 'context' parameter
     const showInputBox = checkCodeForInput(sourceCode);
 
     // Load the initial HTML shell, passing the new boolean
-    visualizerPanel.webview.html = getVisualizerHTML(sourceCode, "[]", "", null, showInputBox);
+    visualizerPanel.webview.html = getVisualizerHtml(sourceCode, "[]", "", null, showInputBox);
 
     // Listen for messages FROM the Webview
     visualizerPanel.webview.onDidReceiveMessage(
@@ -237,7 +237,7 @@ function activate(context) {
  * @param {string | null} errorData
  * @param {boolean} initialShowInputBox
  */
-function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, initialShowInputBox) {
+function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, initialShowInputBox) {
     
     const safeSourceCode = JSON.stringify(sourceCode);
     const safeErrorData = JSON.stringify(errorData || null);
@@ -246,7 +246,7 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
         <!DOCTYPE html>
         <html lang="en">
         <head>
-            <meta charset="UTF-8">
+            <meta charset="UTF8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Python Visualizer</title>
             <style>
@@ -320,16 +320,18 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                     flex-direction: column;
                     overflow: hidden;
                 }
-                #varsDisplay, #outputDisplay {
+                
+                #varsDisplay, #globalsDisplay, #outputDisplay {
                     font-family: "Consolas", "Courier New", monospace;
                     padding: 15px;
                     overflow-y: auto;
                 }
-                #varsDisplay {
+                #varsDisplay, #globalsDisplay {
                     flex-shrink: 1;
                     min-height: 100px;
                     border-bottom: 1px solid var(--vscode-sideBar-border, #333);
                 }
+                
                 #outputDisplay { flex-grow: 1; }
                 #outputContent { white-space: pre-wrap; }
                 .highlight-line { 
@@ -340,32 +342,34 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                     opacity: 0.5;
                 }
 
-                /* --- Variable Table Styles --- */
-                #varsTable {
+                #varsTable, #globalsTable {
                     width: 100%;
                     border-collapse: collapse;
-                    table-layout: fixed; /* Keeps columns from resizing wildly */
+                    table-layout: fixed;
                 }
-                #varsTable th {
+                #varsTable th, #globalsTable th {
                     text-align: left;
                     padding: 4px 8px;
                     border-bottom: 2px solid var(--vscode-sideBar-border, #333);
                 }
-                #varsTable td {
+                #varsTable td, #globalsTable td {
                     padding: 4px 8px;
                     border-bottom: 1px solid var(--vscode-sideBar-border, #333);
                     vertical-align: top;
-                    /* Allow long values to wrap */
                     word-wrap: break-word;
                     white-space: pre-wrap;
                 }
-                #varsTable td:first-child {
-                    /* Variable name column */
+                #varsTable td:first-child, #globalsTable td:first-child {
                     width: 35%;
                     font-weight: bold;
                 }
-                #varsTable tr:last-child td {
+                #varsTable tr:last-child td, #globalsTable tr:last-child td {
                     border-bottom: none;
+                }
+
+                /* --- Hide local vars by default --- */
+                #varsDisplay {
+                    display: none;
                 }
 
             </style>
@@ -383,9 +387,11 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                 <button id="nextBtn">Next »</button>
                 <span id="stepLabel">Step: 0 / 0</span>
             </div>
+            
             <div id="main">
                 <div id="codeDisplay"></div>
                 <div id="sidebar">
+                    <div id="globalsDisplay"></div>
                     <div id="varsDisplay"></div>
                     <div id="outputDisplay">
                         <h4>Program Output</h4>
@@ -413,6 +419,7 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                 const stepLabel = document.getElementById('stepLabel');
                 const stepSlider = document.getElementById('stepSlider');
                 const codeDisplay = document.getElementById('codeDisplay');
+                const globalsDisplay = document.getElementById('globalsDisplay');
                 const varsDisplay = document.getElementById('varsDisplay');
                 const outputContent = document.getElementById('outputContent');
                 
@@ -426,6 +433,7 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                     
                     const step = trace[currentIndex];
                     const currentLine = step.line_no;
+                    const funcName = step.func_name;
 
                     // 2. Render Code + Highlight
                     let codeHtml = '';
@@ -436,26 +444,51 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                     }
                     codeDisplay.innerHTML = codeHtml;
                     
-                    // 3. Render Variables as a Table
-                    let varsHtml = '<h4>Local Variables</h4>';
-                    const localVars = step.local_vars;
-
-                    if (Object.keys(localVars).length > 0) {
-                        varsHtml += '<table id="varsTable"><thead><tr><th>Variable</th><th>Value</th></tr></thead><tbody>';
-                        for (const key in localVars) {
-                            const value = localVars[key];
+                    // 3. Render Global Variables
+                    let globalsHtml = '<h4>Global Variables</h4>';
+                    const globalVars = step.global_vars;
+                    if (globalVars && Object.keys(globalVars).length > 0) {
+                        globalsHtml += '<table id="globalsTable"><thead><tr><th>Variable</th><th>Value</th></tr></thead><tbody>';
+                        for (const key in globalVars) {
+                            if (key.startsWith('__') || key === 'MockStdin' || key === 'safe_serialize' || key === 'tracer') {
+                                continue;
+                            }
+                            const value = globalVars[key];
                             const safeKey = key.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                             const safeValue = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                            
-                            varsHtml += \`<tr><td>\${safeKey}</td><td>\${safeValue}</td></tr>\`;
+                            globalsHtml += \`<tr><td>\${safeKey}</td><td>\${safeValue}</td></tr>\`;
                         }
-                        varsHtml += '</tbody></table>';
+                        globalsHtml += '</tbody></table>';
                     } else {
-                        varsHtml += '<span>No local variables in this step.</span>';
+                        globalsHtml += '<span>No global variables in this step.</span>';
                     }
-                    varsDisplay.innerHTML = varsHtml;
-                    
-                    // 4. Render Cumulative Output
+                    globalsDisplay.innerHTML = globalsHtml;
+
+                    // 4. Render Local Variables (Only if in a function)
+                    if (funcName !== '<module>') {
+                        varsDisplay.style.display = 'block'; // Show the panel
+                        let varsHtml = '<h4>Local Variables</h4>';
+                        const localVars = step.local_vars;
+                        if (localVars && Object.keys(localVars).length > 0) {
+                            varsHtml += '<table id="varsTable"><thead><tr><th>Variable</th><th>Value</th></tr></thead><tbody>';
+                            for (const key in localVars) {
+                                const value = localVars[key];
+                                const safeKey = key.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                const safeValue = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                varsHtml += \`<tr><td>\${safeKey}</td><td>\${safeValue}</td></tr>\`;
+                            }
+                            varsHtml += '</tbody></table>';
+                        } else {
+                            varsHtml += '<span>No local variables in this step.</span>';
+                        }
+                        varsDisplay.innerHTML = varsHtml;
+                    } else {
+                        // We are in the global scope, so hide the locals panel
+                        varsDisplay.style.display = 'none';
+                        varsDisplay.innerHTML = '';
+                    }
+
+                    // 5. Render Cumulative Output
                     let cumulativeOutput = '';
                     for (let i = 0; i <= currentIndex; i++) {
                         if (trace[i].output) {
@@ -497,7 +530,10 @@ function getVisualizerHTML(sourceCode, traceData, currentInputs, errorData, init
                         nextBtn.disabled = true;
                         stepSlider.disabled = true;
                         codeDisplay.innerHTML = '';
-                        varsDisplay.innerHTML = '<h4>Local Variables</h4>';
+                        // Also hide/clear locals
+                        varsDisplay.style.display = 'none';
+                        varsDisplay.innerHTML = '';
+                        globalsDisplay.innerHTML = '<h4>Global Variables</h4>';
                         outputContent.textContent = '';
                     }
                 }
