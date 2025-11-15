@@ -7,10 +7,36 @@ redirected_stdout = io.StringIO()
 execution_trace = []
 main_filename = None
 
+class EchoingStringIO:
+    def __init__(self, input_str):
+        self._buffer = io.StringIO(input_str)
+        self._eof_return = "\n" # What input() gets if buffer is empty
+
+    def readline(self):
+        # 1. Read one line from our internal buffer
+        line = self._buffer.readline()
+        
+        if not line:
+            # If the buffer is empty, just return a newline
+            # (simulates user pressing Enter on an empty input)
+            # We don't echo this, as it's not "real" input.
+            return self._eof_return 
+            
+        # 2. --- THIS IS THE FIX ---
+        #    Echo the line (e.g., "5\n") to stdout
+        #    so it gets captured by our tracer's output.
+        sys.stdout.write(line)
+        # --- END OF FIX ---
+        
+        # 3. Return the line to the 'input()' function
+        return line
+
+
 class MockStdin:
     """A fake stdin that simulates a user pressing 'Enter'."""
     def readline(self):
         return "\n"
+
 
 def safe_serialize(obj):
     """
@@ -21,17 +47,13 @@ def safe_serialize(obj):
     if not isinstance(obj, dict):
         return {}
 
-    # Iterate over a copy to avoid mutation errors
     for key, value in obj.copy().items():
-        # Skip private vars, modules, and callables
         if key.startswith('__') or callable(value) or 'module' in str(type(value)):
             continue
         
         try:
-            # repr() is the safest way to get a string
             safe_vars[key] = repr(value)
         except Exception:
-            # Catch errors on complex objects that fail repr()
             safe_vars[key] = f"<Unserializable type {type(value).__name__}>"
     
     return safe_vars
@@ -44,7 +66,6 @@ def tracer(frame, event, arg):
     global redirected_stdout
     global main_filename
 
-    # 1. Handle 'call' event to step into functions
     if event == 'call':
         try:
             frame_filename = os.path.normcase(os.path.abspath(frame.f_code.co_filename))
@@ -56,7 +77,6 @@ def tracer(frame, event, arg):
         
         return tracer 
     
-    # 2. Handle 'line' or 'return' events
     if event == 'line' or event == 'return':
         output = redirected_stdout.getvalue()
         redirected_stdout.seek(0)
@@ -66,29 +86,22 @@ def tracer(frame, event, arg):
         func_name = code.co_name
         line_no = frame.f_lineno
         
-        # --- THIS IS THE CHANGE ---
-        
-        # 3. Clean and serialize f_locals
         locals_copy = frame.f_locals.copy()
         locals_copy.pop('frame', None)
         locals_copy.pop('event', None)
         locals_copy.pop('arg', None)
         local_vars = safe_serialize(locals_copy)
         
-        # 4. Serialize f_globals
         global_vars = safe_serialize(frame.f_globals)
         
-        # 5. Add *both* to the snapshot
         snapshot = {
             'event': event,
             'func_name': func_name,
             'line_no': line_no,
             'local_vars': local_vars,
-            'global_vars': global_vars, # <-- NEW
+            'global_vars': global_vars,
             'output': output
         }
-        # --- END OF CHANGE ---
-        
         execution_trace.append(snapshot)
     
     return tracer
@@ -114,10 +127,15 @@ if __name__ == "__main__":
     original_stdin = sys.stdin
     
     if input_data_str:
+        # Convert the "\\n" string back to a real newline
         input_data = input_data_str.replace("\\n", "\n")
-        sys.stdin = io.StringIO(input_data)
+        if not input_data.endswith("\n"):
+            input_data += "\n"
+        # Use our new echoing class
+        sys.stdin = EchoingStringIO(input_data)
     else:
-        sys.stdin = MockStdin()
+        # Use the new class with an empty string
+        sys.stdin = EchoingStringIO("")
     
     scope = {}
     
@@ -143,21 +161,17 @@ if __name__ == "__main__":
         sys.stdout = original_stdout
         sys.stdin = original_stdin 
     
-    # --- Success Case ---
+    # --- Success Case (This part is unchanged and correct) ---
     final_output = redirected_stdout.getvalue()
     if execution_trace:
         execution_trace[-1]['output'] += final_output
         
         final_global_vars = safe_serialize(scope)
         
-        # --- THIS IS THE CHANGE ---
-        # Set the *final* global state on the last step
         execution_trace[-1]['global_vars'] = final_global_vars
         
-        # Only set local vars if the last step was *in* the global scope
         if execution_trace[-1]['func_name'] == '<module>':
             execution_trace[-1]['local_vars'] = final_global_vars
-        # --- END OF CHANGE ---
         
     print(json.dumps(execution_trace, indent=2))
     sys.exit(EXIT_CODE_SUCCESS)

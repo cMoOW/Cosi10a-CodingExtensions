@@ -8,7 +8,7 @@ let visualizerPanel = undefined;
 let associatedDocument = undefined;
 let currentInput = "";
 let debounceTimer = undefined;
-let extensionContext = undefined; // <-- NEW: To store the context
+let extensionContext = undefined; 
 
 /**
  * Logic from the 'startCommand'
@@ -65,7 +65,7 @@ function createOrShowPanel() { // <-- No 'context' parameter
     runTracerAndPostUpdate(); // <-- No 'context' parameter
 }
 
-// --- NEW: Helper function to check for input() ---
+
 /**
  * Scans the code line-by-line to see if 'input()' is
  * present and *not* inside a comment.
@@ -140,7 +140,7 @@ function runTracerAndPostUpdate() { // <-- No 'context' parameter
         errorData += data.toString();
     });
 
-    // --- THIS IS THE UPDATED LOGIC ---
+
     tracerProcess.on('close', (code) => {
         if (!visualizerPanel) {
             return; 
@@ -190,7 +190,6 @@ function runTracerAndPostUpdate() { // <-- No 'context' parameter
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-    // --- FIX: Store the context in our module variable ---
     extensionContext = context;
 
     // 1. Register the "start" command
@@ -202,7 +201,6 @@ function activate(context) {
     let changeListener = vscode.workspace.onDidChangeTextDocument(
         onDocumentChange // No need to pass context
     );
-    // --- NEW: Register the "tab change" listener ---
     let tabChangeListener = vscode.window.onDidChangeActiveTextEditor(editor => {
         // Check 1: Is our panel open?
         if (!visualizerPanel) {
@@ -500,15 +498,13 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
 
                 function updateUI(newSourceCode, newTraceData, newErrorData, newInputs, newShowInputBox) {
                     sourceCode = newSourceCode;
-                    trace = JSON.parse(newTraceData);
+                    trace = JSON.parse(newTraceData); 
                     errorData = newErrorData;
                     codeLines = sourceCode.split('\\n');
                     
                     inputArea.style.display = newShowInputBox ? 'block' : 'none';
 
-                    if (document.activeElement !== inputBox) {
-                        inputBox.value = newInputs.replace(/\\n/g, '\\n');
-                    }
+
                     if (errorData) {
                         errorDisplay.innerHTML = \`
                             <h4>Tracer Failed (check inputs or code):</h4>
@@ -570,6 +566,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     currentIndex = parseInt(stepSlider.value, 10);
                     render();
                 };
+
                 rerunBtn.onclick = () => {
                     const inputText = inputBox.value;
                     const safeInput = inputText.replace(/\\n/g, '\\\\n').replace(/\\n/g, '\\\\n');
@@ -579,8 +576,8 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     });
                 };
 
-                // Initial Render
                 updateUI(sourceCode, JSON.stringify(trace), errorData, "${currentInputs}", showInputBox);
+
             </script>
         </body>
         </html>
