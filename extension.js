@@ -6,18 +6,39 @@ const path = require('path');
 //const { activateHighlighter } = require('./src/highlight.js');
 const { createTicketFromEmailData } = require('./src/create-ticket.js');
 const { NoteManager } = require('./PostIt/noteManager');
+const { EmailUIManager } = require('./PostIt/emailUIManager');
+const {supabase} = require('./src/supabaseClient.js');
+
+const visualizer = require('./src/visualizer.js');
+const EMAIL_KEY = 'myExtension.userEmail';
+
+
 
 // This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
 
+    // --- NEW COMMAND TO CLEAR EMAIL ---
+    let clearEmailDisposable = vscode.commands.registerCommand('extension.clearEmail', async () => {
+        // 1. Clear our stored email
+        await context.globalState.update(EMAIL_KEY, undefined);
+        vscode.window.showInformationMessage('Your stored email has been cleared.');
+    });
+    context.subscriptions.push(clearEmailDisposable);
+
+    // Command to get email
+    let getEmailDisposable = vscode.commands.registerCommand('extension.getUserEmail', () => {
+        getUserEmail(context);
+    });
+    context.subscriptions.push(getEmailDisposable);
+
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "test" is now active!');
+
+
 	vscode.window.showInformationMessage('This extension is now active!');
 	
 	// Create status bar item for notes
@@ -40,13 +61,6 @@ function activate(context) {
 		await noteManager.refreshNotes();
 		// Status bar will be updated automatically by the callback
 	};
-
-	const disposable = vscode.commands.registerCommand('test.helloWorld', function () {
-		// The code you place here will be executed every time your command is executed
-
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello world has been run');
-	});
 
 	// View Notes Command
 	let viewNotesCommand = vscode.commands.registerCommand('test.viewNotes', async () => {
@@ -74,6 +88,9 @@ function activate(context) {
 		}
 	});
 
+	let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', async function () {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return;
 
 	async function sendEmailCommandHandler(highlightedText, documentText, noteManager, editor) {
 		const panel = vscode.window.createWebviewPanel(
@@ -189,15 +206,11 @@ function activate(context) {
 	// 	if (editor) {
 	// 		const selection = editor.selection;
 	// 		const selectedText = editor.document.getText(selection);
-	// 		console.log('Selected text:', selectedText);
-	// 		vscode.window.showInformationMessage(`Selected text logged to console: ${selectedText}`);
-			
-	// 		sendEmailCommandHandler(selectedText, editor.document.getText());
+	// 		sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager, editor);
 	// 	}
 	// });
-
+ 
 	// Register all commands
-	context.subscriptions.push(disposable);
 	context.subscriptions.push(viewNotesCommand);
 	context.subscriptions.push(addNoteCommand);
 	context.subscriptions.push(addNoteFromSelectionCommand);
@@ -205,6 +218,10 @@ function activate(context) {
 
 	// highlight TODO: Uncomment this line to enable the highlighter functionality
 	// activateHighlighter(context);
+   
+    // Activate the python visualizer 
+    visualizer.activate(context);
+
 }
 
 
@@ -300,17 +317,13 @@ function getTicketFormHTML() {
     `;
 }
 
-
-/**
- * Handles the logic for the "helloWorld" command.
- * It prompts the user for email details and calls the email service.
- */
-
-
 // This method is called when your extension is deactivated
-function deactivate() {}
+function deactivate() {
+    visualizer.deactivate();
+}
 
 module.exports = {
 	activate,
-	deactivate
+	deactivate,
+	getUserEmail
 }

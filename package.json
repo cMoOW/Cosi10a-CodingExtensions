@@ -7,6 +7,10 @@
   "engines": {
     "vscode": "^1.80.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cMoOW/Cosi10a-CodingExtensions.git"
+  },
   "categories": [
     "Other"
   ],
@@ -40,6 +44,18 @@
       {
         "command": "test.addNoteFromSelection",
         "title": "Add Selected Text as Note"
+      },
+      {
+        "command": "extension.getUserEmail",
+        "title": "Get User Email"
+      },
+      {
+        "command": "extension.clearEmail",
+        "title": "Clear Stored Email"
+      },
+      {
+        "command": "visualizer.start",
+        "title": "Start Code Visualizer"
       }
     ],
     "menus": {
@@ -51,6 +67,13 @@
         {
           "command": "test.addNoteFromSelection",
           "when": "editorHasSelection"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "visualizer.start",
+          "when": "editorLangId == python",
+          "group": "navigation"
         }
       ]
     }
