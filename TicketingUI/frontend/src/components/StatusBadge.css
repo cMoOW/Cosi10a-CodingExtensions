@@ -1,0 +1,36 @@
+/* StatusBadge.css */
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-open {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-in-progress {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.status-resolved {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.status-closed {
+  background: #f3e5f5;
+  color: #6a1b9a;
+}
+
+.status-unknown {
+  background: #eceff1;
+  color: #546e7a;
+}
+

@@ -1,0 +1,58 @@
+/* CodeViewer.css */
+.code-viewer {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.code-viewer-header {
+  background: #2c3e50;
+  padding: 0.5rem 1rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.copy-btn {
+  padding: 0.25rem 0.75rem;
+  background: #34495e;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.copy-btn:hover {
+  background: #2c3e50;
+}
+
+.no-code {
+  padding: 2rem;
+  text-align: center;
+  color: #95a5a6;
+  font-style: italic;
+}
+
+.language-label {
+  color: #ecf0f1;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.code-viewer-fallback {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 1rem;
+  margin: 0;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  border-radius: 0 0 4px 4px;
+}
+
+.code-viewer-fallback code {
+  color: inherit;
+  font-family: inherit;
+}
+
