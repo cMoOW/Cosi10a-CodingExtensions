@@ -2,7 +2,7 @@
 
 This is a group project to design and build **custom VS Code extensions** that streamline the workflow for students in an **Introduction to Python course** 
 
-The goal is to make it easier for students to install tools, follow style guides, and submit assignments with minimal setup, so they can focus on learning Python instead of fighting with their environment.
+The goal is to make it easier for students to install tools, follow style guides, and submit assignments with minimal setup, so they can focus on learning Python instead of fighting with their environment. Test etest 
 
 ---
 
