@@ -1,4 +1,6 @@
 // The module 'vscode' contains the VS Code extensibility API
+
+
 // Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
 const path = require('path');
@@ -88,9 +90,9 @@ function activate(context) {
 		}
 	});
 
-	let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', async function () {
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) return;
+	// let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', async function () {
+    //     const editor = vscode.window.activeTextEditor;
+    //     if (!editor) return;
 
 	async function sendEmailCommandHandler(highlightedText, documentText, noteManager, editor) {
 		const panel = vscode.window.createWebviewPanel(
@@ -150,44 +152,7 @@ function activate(context) {
 			}
 		});
 		
-		// try {
-		//    // 1. Prompt for the email body, need validation!!
-		//   let email = await vscode.window.showInputBox({
-		// 	prompt: "Enter your Brandeis email",
-		// 	placeHolder: "Type your Brandeis email here..."
-		//   });
-		//   while (!email || !email.includes('@brandeis.edu')) {
-		// 	vscode.window.showInformationMessage('Please enter a valid Brandeis email address.');
-		// 	email = await vscode.window.showInputBox({
-		// 	  prompt: "Enter your Brandeis email",
-		// 	  placeHolder: "Type your Brandeis email here..."
-		// 	});
-		//   }
-	  
-		//   // redundant now with validation loop above
-		//   //if (!email) return vscode.window.showInformationMessage('Email sending cancelled.');
-		 
-		//   const message = await vscode.window.showInputBox({
-		// 	prompt: "Enter your message",
-		// 	placeHolder: "Type your message here..."
-		//   });
-	  
-		//   if (!message) return vscode.window.showInformationMessage('Email sending cancelled.');
-		//   // Call the email service with all the user's input
-		//   const messageId = await sendHelloEmail(highlightedText, documentText, email, message);
-	  
-		//   console.log('Email sent successfully. Message ID:', messageId);
-		//   // vscode.window.showInformationMessage(`Email successfully sent! Message ID: ${messageId}`);
-		//   vscode.window.showInformationMessage('Email successfully sent!');
-	  
-	  
-		//   await noteManager.addNote(message);
-		// 	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
-	  
-		// } catch (error) {
-		//   console.error('Error sending email:', error);
-		//   vscode.window.showErrorMessage('Failed to send email: ' + error.message);
-		// }
+		
 	  }
 
 	  let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
@@ -198,17 +163,6 @@ function activate(context) {
 			sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager, editor);
 		}
 	});
- 
-	// const emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
-	// 	// Get the active text editor
-		
-	// 	const editor = vscode.window.activeTextEditor;
-	// 	if (editor) {
-	// 		const selection = editor.selection;
-	// 		const selectedText = editor.document.getText(selection);
-	// 		sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager, editor);
-	// 	}
-	// });
  
 	// Register all commands
 	context.subscriptions.push(viewNotesCommand);
@@ -223,6 +177,7 @@ function activate(context) {
     visualizer.activate(context);
 
 }
+
 
 
 function getTicketFormHTML() {
@@ -317,9 +272,22 @@ function getTicketFormHTML() {
     `;
 }
 
+
 // This method is called when your extension is deactivated
 function deactivate() {
     visualizer.deactivate();
+}
+
+function getUserEmail(context){
+	 const storedEmail = context.globalState.get(EMAIL_KEY);
+	if(storedEmail){
+		console.log("Retrieved Stored email:", storedEmail);
+		return storedEmail;
+	}else{
+		console.log("No stored email found.");
+		return null;
+	}
+	
 }
 
 module.exports = {
