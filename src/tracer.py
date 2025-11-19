@@ -2,6 +2,7 @@ import sys
 import json
 import io
 import os
+import random # --- NEW IMPORT ---
 
 redirected_stdout = io.StringIO()
 execution_trace = []
@@ -10,39 +11,21 @@ main_filename = None
 class EchoingStringIO:
     def __init__(self, input_str):
         self._buffer = io.StringIO(input_str)
-        self._eof_return = "\n" # What input() gets if buffer is empty
+        self._eof_return = "\n" 
 
     def readline(self):
-        # 1. Read one line from our internal buffer
         line = self._buffer.readline()
-        
         if not line:
-            # If the buffer is empty, just return a newline
-            # (simulates user pressing Enter on an empty input)
-            # We don't echo this, as it's not "real" input.
             return self._eof_return 
-            
-        # 2. --- THIS IS THE FIX ---
-        #    Echo the line (e.g., "5\n") to stdout
-        #    so it gets captured by our tracer's output.
         sys.stdout.write(line)
-        # --- END OF FIX ---
-        
-        # 3. Return the line to the 'input()' function
         return line
-
 
 class MockStdin:
     """A fake stdin that simulates a user pressing 'Enter'."""
     def readline(self):
         return "\n"
 
-
 def safe_serialize(obj):
-    """
-    A robust serializer that iterates over a dictionary,
-    skipping known unserializable types.
-    """
     safe_vars = {}
     if not isinstance(obj, dict):
         return {}
@@ -58,11 +41,7 @@ def safe_serialize(obj):
     
     return safe_vars
 
-
 def tracer(frame, event, arg):
-    """
-    The main tracer function.
-    """
     global redirected_stdout
     global main_filename
 
@@ -73,7 +52,7 @@ def tracer(frame, event, arg):
             return None 
         
         if frame_filename != main_filename:
-            return None # Not our code
+            return None 
         
         return tracer 
     
@@ -120,6 +99,19 @@ if __name__ == "__main__":
     
     input_data_str = sys.argv[1]
     script_to_run = sys.argv[2] 
+    
+    # --- NEW: Handle Random Seed ---
+    # sys.argv looks like: [tracer.py, inputs, script_path, seed]
+    if len(sys.argv) > 3:
+        try:
+            seed_val = int(sys.argv[3])
+            random.seed(seed_val)
+        except ValueError:
+            pass # If seed is invalid, ignore it
+    else:
+        random.seed(42) # Default deterministic seed
+    # -------------------------------
+
     script_content = sys.stdin.read()
     
     original_stdout = sys.stdout
@@ -127,14 +119,11 @@ if __name__ == "__main__":
     original_stdin = sys.stdin
     
     if input_data_str:
-        # Convert the "\\n" string back to a real newline
         input_data = input_data_str.replace("\\n", "\n")
         if not input_data.endswith("\n"):
             input_data += "\n"
-        # Use our new echoing class
         sys.stdin = EchoingStringIO(input_data)
     else:
-        # Use the new class with an empty string
         sys.stdin = EchoingStringIO("")
     
     scope = {}
@@ -161,7 +150,6 @@ if __name__ == "__main__":
         sys.stdout = original_stdout
         sys.stdin = original_stdin 
     
-    # --- Success Case (This part is unchanged and correct) ---
     final_output = redirected_stdout.getvalue()
     if execution_trace:
         execution_trace[-1]['output'] += final_output
