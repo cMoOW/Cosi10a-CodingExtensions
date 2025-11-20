@@ -6,6 +6,7 @@ const vscode = require('vscode');
 const path = require('path');
 // Import the highlighter functionality from the new file
 //const { activateHighlighter } = require('./src/highlight.js');
+const { sendEmail } = require('./src/send-email.js');
 const { createTicketFromEmailData } = require('./src/create-ticket.js');
 const { NoteManager } = require('./PostIt/noteManager');
 const { EmailUIManager } = require('./PostIt/emailUIManager');
@@ -93,6 +94,51 @@ function activate(context) {
 	// let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', async function () {
     //     const editor = vscode.window.activeTextEditor;
     //     if (!editor) return;
+
+        const selection = editor.selection;
+        const selectedText = editor.document.getText(selection);
+        const documentText = editor.document.getText();
+
+        const emailUI = new EmailUIManager(context);
+        const emailList = {"Brian Shen": "brianshen@brandeis.edu", 
+                            "Apoorva Uppal": "auppal@brandeis.edu", 
+                            "Jacob Carminati": "jacobcarminati@brandeis.edu", 
+                            "SiMing Lin": "siminglin@brandeis.edu"};
+        const storedEmail = context.globalState.get(EMAIL_KEY) || '';
+
+        // Show the email editor window
+        await emailUI.showEmailEditor(selectedText, emailList, storedEmail);
+
+        // When user clicks "Send"
+        emailUI.onSend(async ({ userEmail, recipients, noteContent }) => {
+            try {
+                // Validate user email
+                if (!userEmail.endsWith('@brandeis.edu')) {
+                    vscode.window.showErrorMessage('Your email must be a valid Brandeis email address.');
+                    return;
+                }
+                // Validate recipient emails
+                const invalidEmails = recipients.filter(e => !e.endsWith('@brandeis.edu'));
+                if (invalidEmails.length > 0) {
+                    vscode.window.showErrorMessage(`Invalid Brandeis emails: ${invalidEmails.join(', ')}`);
+                    return;
+                }
+
+                // Store user email for next time
+                await context.globalState.update(EMAIL_KEY, userEmail);
+
+                // Send the actual email
+                await sendEmail(selectedText, documentText, userEmail, recipients.join(','), noteContent);
+                vscode.window.showInformationMessage('Email successfully sent!');
+
+                // Optional: Add as a note
+                await noteManager.addNote(noteContent);
+
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to send email: ' + error.message);
+            }
+        });
+    });
 
 	async function sendEmailCommandHandler(highlightedText, documentText, noteManager, editor) {
 		const panel = vscode.window.createWebviewPanel(
