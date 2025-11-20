@@ -103,6 +103,9 @@ function onDocumentChange(event) {
     }, 750);
 }
 
+/**
+ * Runs the tracer and posts the update to the webview
+ */
 function runTracerAndPostUpdate() {
     if (!visualizerPanel || !associatedDocument) return;
     visualizerPanel.webview.postMessage({ command: 'showLoading' });
@@ -116,13 +119,34 @@ function runTracerAndPostUpdate() {
     const pythonCommand = 'python3';
 
     const showInputBox = checkCodeForInput(sourceCode);
-    const hasRandomness = checkCodeForRandomness(sourceCode); // Check on every run
+    const hasRandomness = checkCodeForRandomness(sourceCode);
 
     const tracerProcess = spawn(
         pythonCommand,
         [tracerPath, allInputs, scriptPath, currentSeed], 
         { cwd: scriptDir }
     );
+
+    // --- NEW: Timeout Logic (3 Seconds) ---
+    const TIMEOUT_MS = 3000; 
+    const killTimer = setTimeout(() => {
+        if (!tracerProcess.killed) {
+            tracerProcess.kill(); // Force stop
+            
+            if (visualizerPanel) {
+                visualizerPanel.webview.postMessage({
+                    command: 'updateTrace',
+                    sourceCode: sourceCode,
+                    traceData: "[]",
+                    errorData: "Error: Execution timed out (infinite loop?).\nScript took longer than 3 seconds.",
+                    currentInputs: allInputs,
+                    showInputBox: showInputBox,
+                    hasRandomness: hasRandomness
+                });
+            }
+        }
+    }, TIMEOUT_MS);
+    // -------------------------------------
 
     let traceDataJson = '';
     let errorData = '';
@@ -131,7 +155,15 @@ function runTracerAndPostUpdate() {
     tracerProcess.stderr.on('data', (data) => { errorData += data.toString(); });
 
     tracerProcess.on('close', (code) => {
+        // Clear the timeout since it finished successfully (or failed normally)
+        clearTimeout(killTimer); 
+
         if (!visualizerPanel) return;
+
+        // If the process was killed by our timer, 'code' might be null or a signal.
+        // We handled the UI update in the setTimeout callback, so we can return early 
+        // if the process was killed.
+        if (tracerProcess.killed) return;
 
         const EXIT_CODE_SUCCESS = 0;
         const EXIT_CODE_RUNTIME_ERROR = 1;
@@ -145,13 +177,13 @@ function runTracerAndPostUpdate() {
                 errorData: null,
                 currentInputs: allInputs,
                 showInputBox: showInputBox,
-                hasRandomness: hasRandomness // Pass this flag
+                hasRandomness: hasRandomness
             });
         } else if (code === EXIT_CODE_RUNTIME_ERROR) {
             visualizerPanel.webview.postMessage({
                 command: 'updateTrace',
                 sourceCode: sourceCode,
-                traceData: traceDataJson,
+                traceData: traceDataJson, 
                 errorData: errorData,
                 currentInputs: allInputs,
                 showInputBox: showInputBox,
