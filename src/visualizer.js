@@ -151,7 +151,7 @@ function runTracerAndPostUpdate() {
             visualizerPanel.webview.postMessage({
                 command: 'updateTrace',
                 sourceCode: sourceCode,
-                traceData: "[]",
+                traceData: traceDataJson,
                 errorData: errorData,
                 currentInputs: allInputs,
                 showInputBox: showInputBox,
