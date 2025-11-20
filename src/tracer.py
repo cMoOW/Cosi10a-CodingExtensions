@@ -2,6 +2,7 @@ import sys
 import json
 import io
 import os
+import random 
 
 redirected_stdout = io.StringIO()
 execution_trace = []
@@ -10,39 +11,21 @@ main_filename = None
 class EchoingStringIO:
     def __init__(self, input_str):
         self._buffer = io.StringIO(input_str)
-        self._eof_return = "\n" # What input() gets if buffer is empty
+        self._eof_return = "\n" 
 
     def readline(self):
-        # 1. Read one line from our internal buffer
         line = self._buffer.readline()
-        
         if not line:
-            # If the buffer is empty, just return a newline
-            # (simulates user pressing Enter on an empty input)
-            # We don't echo this, as it's not "real" input.
             return self._eof_return 
-            
-        # 2. --- THIS IS THE FIX ---
-        #    Echo the line (e.g., "5\n") to stdout
-        #    so it gets captured by our tracer's output.
         sys.stdout.write(line)
-        # --- END OF FIX ---
-        
-        # 3. Return the line to the 'input()' function
         return line
-
 
 class MockStdin:
     """A fake stdin that simulates a user pressing 'Enter'."""
     def readline(self):
         return "\n"
 
-
 def safe_serialize(obj):
-    """
-    A robust serializer that iterates over a dictionary,
-    skipping known unserializable types.
-    """
     safe_vars = {}
     if not isinstance(obj, dict):
         return {}
@@ -58,11 +41,7 @@ def safe_serialize(obj):
     
     return safe_vars
 
-
 def tracer(frame, event, arg):
-    """
-    The main tracer function.
-    """
     global redirected_stdout
     global main_filename
 
@@ -73,7 +52,7 @@ def tracer(frame, event, arg):
             return None 
         
         if frame_filename != main_filename:
-            return None # Not our code
+            return None 
         
         return tracer 
     
@@ -108,11 +87,14 @@ def tracer(frame, event, arg):
 
 # --- Main script execution ---
 if __name__ == "__main__":
-    #global main_filename
+   # global main_filename
 
     EXIT_CODE_SUCCESS = 0
     EXIT_CODE_RUNTIME_ERROR = 1
     EXIT_CODE_SYNTAX_ERROR = 2
+
+    # We will store the exit code here and exit at the very end
+    final_exit_code = EXIT_CODE_SUCCESS
 
     if len(sys.argv) < 3:
         print("Error: Missing args.", file=sys.stderr)
@@ -120,6 +102,16 @@ if __name__ == "__main__":
     
     input_data_str = sys.argv[1]
     script_to_run = sys.argv[2] 
+    
+    if len(sys.argv) > 3:
+        try:
+            seed_val = int(sys.argv[3])
+            random.seed(seed_val)
+        except ValueError:
+            pass 
+    else:
+        random.seed(42) 
+
     script_content = sys.stdin.read()
     
     original_stdout = sys.stdout
@@ -127,14 +119,11 @@ if __name__ == "__main__":
     original_stdin = sys.stdin
     
     if input_data_str:
-        # Convert the "\\n" string back to a real newline
         input_data = input_data_str.replace("\\n", "\n")
         if not input_data.endswith("\n"):
             input_data += "\n"
-        # Use our new echoing class
         sys.stdin = EchoingStringIO(input_data)
     else:
-        # Use the new class with an empty string
         sys.stdin = EchoingStringIO("")
     
     scope = {}
@@ -143,6 +132,7 @@ if __name__ == "__main__":
         try:
             main_code_object = compile(script_content, script_to_run, 'exec')
         except (SyntaxError, IndentationError, TabError) as e:
+            # Syntax errors are fatal immediately (cannot trace them)
             print(f"Syntax Error: {e}", file=sys.stderr)
             sys.exit(EXIT_CODE_SYNTAX_ERROR)
             
@@ -151,27 +141,47 @@ if __name__ == "__main__":
         exec(main_code_object, scope, scope)
         
     except Exception as e:
+        # --- THIS IS THE CHANGE ---
+        # We caught a runtime error.
+        # 1. Restore stdout so we can print the error to the real console (stderr)
         sys.stdout = original_stdout 
         sys.stdin = original_stdin 
+        
+        # 2. Print the error message for the Visualizer to capture
         print(f"Error during script execution: {e}", file=sys.stderr)
-        sys.exit(EXIT_CODE_RUNTIME_ERROR)
+        
+        # 3. Set the exit code to ERROR, but DO NOT EXIT YET.
+        #    We still want to print the JSON trace below.
+        final_exit_code = EXIT_CODE_RUNTIME_ERROR
+        # --------------------------
         
     finally:
+        # Restore everything
         sys.settrace(None)
-        sys.stdout = original_stdout
-        sys.stdin = original_stdin 
+        # If we didn't crash, these might still need restoring
+        if sys.stdout != original_stdout:
+            sys.stdout = original_stdout
+        if sys.stdin != original_stdin:
+            sys.stdin = original_stdin 
     
-    # --- Success Case (This part is unchanged and correct) ---
+    # Get any final output pending in the buffer
     final_output = redirected_stdout.getvalue()
+    
+    # Add final state to the last step
     if execution_trace:
         execution_trace[-1]['output'] += final_output
         
-        final_global_vars = safe_serialize(scope)
-        
-        execution_trace[-1]['global_vars'] = final_global_vars
-        
-        if execution_trace[-1]['func_name'] == '<module>':
-            execution_trace[-1]['local_vars'] = final_global_vars
-        
+        # Only try to grab final variables if scope is valid (might not be on crash)
+        try:
+            final_global_vars = safe_serialize(scope)
+            execution_trace[-1]['global_vars'] = final_global_vars
+            if execution_trace[-1]['func_name'] == '<module>':
+                execution_trace[-1]['local_vars'] = final_global_vars
+        except:
+            pass
+
+    # Print the trace (even if it crashed partway through!)
     print(json.dumps(execution_trace, indent=2))
-    sys.exit(EXIT_CODE_SUCCESS)
+    
+    # Exit with the correct code (0 for success, 1 for crash)
+    sys.exit(final_exit_code)
