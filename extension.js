@@ -91,9 +91,9 @@ function activate(context) {
 		}
 	});
 
-	// let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', async function () {
-    //     const editor = vscode.window.activeTextEditor;
-    //     if (!editor) return;
+	let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', async function () {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return;
 
         const selection = editor.selection;
         const selectedText = editor.document.getText(selection);
@@ -201,14 +201,14 @@ function activate(context) {
 		
 	  }
 
-	  let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
-		const editor = vscode.window.activeTextEditor;
-		if (editor) {
-			const selection = editor.selection;
-			const selectedText = editor.document.getText(selection);
-			sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager, editor);
-		}
-	});
+	//   let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', function () {
+	// 	const editor = vscode.window.activeTextEditor;
+	// 	if (editor) {
+	// 		const selection = editor.selection;
+	// 		const selectedText = editor.document.getText(selection);
+	// 		sendEmailCommandHandler(selectedText, editor.document.getText(), noteManager, editor);
+	// 	}
+	// });
  
 	// Register all commands
 	context.subscriptions.push(viewNotesCommand);
@@ -224,7 +224,18 @@ function activate(context) {
 
 }
 
-
+function getUserEmail(context) {
+    const storedEmail = context.globalState.get(EMAIL_KEY);
+    if (storedEmail) {
+        //vscode.window.showInformationMessage(`Your stored email is: ${storedEmail}`);
+		console.log('Retrieved stored email:', storedEmail);
+        return storedEmail;
+    }else{
+        //vscode.window.showInformationMessage('No stored email found.');
+		console.log('No stored email found.');
+        return null;
+    }
+}
 
 function getTicketFormHTML() {
     return `
@@ -322,18 +333,6 @@ function getTicketFormHTML() {
 // This method is called when your extension is deactivated
 function deactivate() {
     visualizer.deactivate();
-}
-
-function getUserEmail(context){
-	 const storedEmail = context.globalState.get(EMAIL_KEY);
-	if(storedEmail){
-		console.log("Retrieved Stored email:", storedEmail);
-		return storedEmail;
-	}else{
-		console.log("No stored email found.");
-		return null;
-	}
-	
 }
 
 module.exports = {
