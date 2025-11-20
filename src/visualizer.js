@@ -187,6 +187,12 @@ function deactivate() {
 
 /**
  * Generates the full HTML/CSS/JS "shell" for the Webview.
+ * @param {string} sourceCode
+ * @param {string} traceData
+ * @param {string} currentInputs
+ * @param {string | null} errorData
+ * @param {boolean} initialShowInputBox
+ * @param {boolean} initialHasRandomness
  */
 function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, initialShowInputBox, initialHasRandomness) {
     
@@ -219,12 +225,25 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 #errorDisplay h4 { margin: 0 0 5px 0; color: #ffcccc; }
                 #errorDisplay pre { white-space: pre-wrap; color: white; margin: 0; }
                 
-                #inputArea { padding: 10px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); display: none; }
-                #inputArea h4 { margin: 0 0 5px 0; }
-                #inputBox { width: calc(100% - 10px); font-family: "Consolas", "Courier New", monospace; color: var(--vscode-input-foreground); background-color: var(--vscode-input-background); border: 1px solid var(--vscode-input-border); margin-bottom: 5px; }
+                /* --- Configuration Area (Always Visible) --- */
+                #inputArea { 
+                    padding: 10px; 
+                    border-bottom: 1px solid var(--vscode-sideBar-border, #333); 
+                    /* display: none;  <-- REMOVED THIS. It is now always a block. */
+                }
+                
+                /* --- Input Section (Conditionally Visible) --- */
+                #inputSection h4 { margin: 0 0 5px 0; }
+                #inputBox { 
+                    width: calc(100% - 10px); 
+                    font-family: "Consolas", "Courier New", monospace; 
+                    color: var(--vscode-input-foreground); 
+                    background-color: var(--vscode-input-background); 
+                    border: 1px solid var(--vscode-input-border); 
+                    margin-bottom: 5px; 
+                }
                 
                 /* --- Button Layouts --- */
-                /* We have two containers that we toggle between */
                 #randomControls { display: flex; gap: 10px; margin-top: 8px; }
                 #standardControls { display: flex; margin-top: 8px; }
                 
@@ -256,19 +275,16 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 #codeDisplay { font-family: "Consolas", "Courier New", monospace; padding: 15px; white-space: pre; overflow-y: auto; width: 60%; border-right: 1px solid var(--vscode-sideBar-border, #333); }
                 #sidebar { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 150px; }
                 
-                /* Resizers */
                 #sidebarResizer { width: 5px; cursor: col-resize; background-color: var(--vscode-scrollbarSlider-background, #444); transition: background-color 0.2s; flex-shrink: 0; }
                 #outputResizer { height: 5px; cursor: row-resize; background-color: var(--vscode-scrollbarSlider-background, #444); transition: background-color 0.2s; flex-shrink: 0; }
                 #sidebarResizer:hover, #outputResizer:hover { background-color: var(--vscode-scrollbarSlider-hoverBackground, #007acc); }
                 
-                /* Panels */
                 #stateContainer { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-height: 50px; }
                 #varsDisplay, #globalsDisplay { padding: 15px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); }
                 #stateContainer > div:last-child { border-bottom: none; }
                 #outputDisplay { height: 30%; padding: 15px; overflow-y: auto; font-family: "Consolas", "Courier New", monospace; border-top: 1px solid var(--vscode-sideBar-border, #333); flex-shrink: 0; }
                 #outputContent { white-space: pre-wrap; }
                 
-                /* Tables */
                 #varsTable, #globalsTable { width: 100%; border-collapse: collapse; table-layout: fixed; }
                 #varsTable th, #globalsTable th { text-align: left; padding: 4px 8px; border-bottom: 2px solid var(--vscode-sideBar-border, #333); }
                 #varsTable td, #globalsTable td { padding: 4px 8px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); vertical-align: top; word-wrap: break-word; white-space: pre-wrap; }
@@ -281,17 +297,21 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
         </head>
         <body>
             <div id="errorDisplay"></div>
-            <div id="inputArea" style="display: ${initialShowInputBox ? 'block' : 'none'}">
-                <h4>Program Input & Controls</h4>
-                <textarea id="inputBox" rows="3"></textarea>
+            
+            <div id="inputArea">
                 
-                <div id="standardControls">
+                <div id="inputSection" style="display: ${initialShowInputBox ? 'block' : 'none'}">
+                    <h4>Program Input</h4>
+                    <textarea id="inputBox" rows="3"></textarea>
+                </div>
+                
+                <div id="standardControls" style="display: ${initialHasRandomness ? 'none' : 'flex'}">
                     <button id="rerunStandardBtn">Re-run Visualization</button>
                 </div>
 
-                <div id="randomControls" style="display: none;">
-                    <button id="rerunNewBtn" title="Run with a fresh random seed">Re-run (New Outcome)</button>
-                    <button id="rerunSameBtn" title="Run with the same random seed">Re-run (Same Outcome)</button>
+                <div id="randomControls" style="display: ${initialHasRandomness ? 'flex' : 'none'}">
+                    <button id="rerunNewBtn" title="Run with a fresh random seed (Different outcome)">Re-run (New Outcome)</button>
+                    <button id="rerunSameBtn" title="Run with the same random seed (Same outcome)">Re-run (Same Outcome)</button>
                 </div>
             </div>
             
@@ -330,15 +350,14 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 let currentSeed = 42; 
                 let codeLines = sourceCode.split('\\n');
 
+                // UI Elements
                 const inputArea = document.getElementById('inputArea');
+                const inputSection = document.getElementById('inputSection'); // NEW
                 const errorDisplay = document.getElementById('errorDisplay');
                 const inputBox = document.getElementById('inputBox');
                 
-                // Containers
                 const standardControls = document.getElementById('standardControls');
                 const randomControls = document.getElementById('randomControls');
-
-                // Buttons
                 const rerunStandardBtn = document.getElementById('rerunStandardBtn');
                 const rerunNewBtn = document.getElementById('rerunNewBtn');
                 const rerunSameBtn = document.getElementById('rerunSameBtn');
@@ -443,10 +462,10 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     errorData = newErrorData;
                     codeLines = sourceCode.split('\\n');
                     
-                    // Toggle Input Area Display
-                    inputArea.style.display = newShowInputBox ? 'block' : 'none';
+                    // --- FIX: Only toggle the specific input section, not the whole area ---
+                    inputSection.style.display = newShowInputBox ? 'block' : 'none';
+                    // ---------------------------------------------------------------------
 
-                    // Toggle Button Groups
                     if (newHasRandomness) {
                         standardControls.style.display = 'none';
                         randomControls.style.display = 'flex';
@@ -484,14 +503,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                         case 'hideLoading': document.body.classList.remove('loading'); break;
                         case 'updateTrace':
                             document.body.classList.remove('loading');
-                            updateUI(
-                                message.sourceCode, 
-                                message.traceData, 
-                                message.errorData, 
-                                message.currentInputs, 
-                                message.showInputBox,
-                                message.hasRandomness // Receive flag
-                            );
+                            updateUI(message.sourceCode, message.traceData, message.errorData, message.currentInputs, message.showInputBox, message.hasRandomness);
                             break;
                     }
                 });
@@ -500,16 +512,12 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 nextBtn.onclick = () => { if (currentIndex < trace.length - 1) { currentIndex++; render(); } };
                 stepSlider.oninput = () => { currentIndex = parseInt(stepSlider.value, 10); render(); };
                 
-                // --- BUTTON HANDLERS ---
-                
-                // 1. Standard Re-run (No seed change logic needed)
                 rerunStandardBtn.onclick = () => {
                     const inputText = inputBox.value;
                     const safeInput = inputText.replace(/\\n/g, '\\\\n'); 
                     vscode.postMessage({ command: 'rerun', text: safeInput, seed: currentSeed });
                 };
 
-                // 2. New Outcome (Change Seed)
                 rerunNewBtn.onclick = () => {
                     const inputText = inputBox.value;
                     const safeInput = inputText.replace(/\\n/g, '\\\\n'); 
@@ -517,14 +525,12 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     vscode.postMessage({ command: 'rerun', text: safeInput, seed: currentSeed });
                 };
 
-                // 3. Same Outcome (Keep Seed)
                 rerunSameBtn.onclick = () => {
                     const inputText = inputBox.value;
                     const safeInput = inputText.replace(/\\n/g, '\\\\n'); 
                     vscode.postMessage({ command: 'rerun', text: safeInput, seed: currentSeed });
                 };
 
-                // Initial Render
                 const initialInputs = ${safeCurrentInputs};
                 inputBox.value = initialInputs.replace(/\\\\n/g, '\\n');
                 updateUI(sourceCode, JSON.stringify(trace), errorData, initialInputs, showInputBox, hasRandomness);
