@@ -10,7 +10,7 @@ const { sendEmail } = require('./src/send-email.js');
 const { createTicketFromEmailData } = require('./src/create-ticket.js');
 const { NoteManager } = require('./PostIt/noteManager');
 const { EmailUIManager } = require('./PostIt/emailUIManager');
-const {supabase} = require('./src/supabaseClient.js');
+// Note: supabaseClient is not needed here - it's used internally by create-ticket.js
 
 const visualizer = require('./src/visualizer.js');
 const EMAIL_KEY = 'myExtension.userEmail';
