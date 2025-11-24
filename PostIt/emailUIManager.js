@@ -6,7 +6,7 @@ class EmailUIManager {
     this.context = context;
     this.panel = null;
   }
-
+  
   async showEmailEditor(initialContent = "", emailList = {}, storedUserEmail = "") {
     const panel = vscode.window.createWebviewPanel(
       "emailNoteEditor",
