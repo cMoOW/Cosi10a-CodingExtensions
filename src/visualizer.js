@@ -11,7 +11,8 @@ let debounceTimer = undefined;
 let extensionContext = undefined;
 
 // --- NEW: Decoration Type for the Editor Highlight ---
-let highlightDecorationType = undefined;
+let prevDecorationType = undefined;
+let nextDecorationType = undefined;
 
 // --- Helpers ---
 function checkCodeForInput(sourceCode) {
@@ -32,10 +33,19 @@ function checkCodeForRandomness(sourceCode) {
 function activate(context) {
     extensionContext = context;
 
-    // --- NEW: Create the highlight style (Yellow background) ---
-    highlightDecorationType = vscode.window.createTextEditorDecorationType({
-        backgroundColor: 'rgba(255, 255, 0, 0.2)', // Soft yellow
-        isWholeLine: true
+    // Decorations for next and previous lines.
+    prevDecorationType = vscode.window.createTextEditorDecorationType({
+        // Blue arrow
+        gutterIconPath: path.join(__dirname, 'arrow_icon_prev.png'),
+        gutterIconSize: 'contain', 
+    });
+    nextDecorationType = vscode.window.createTextEditorDecorationType({
+        // Green arrow
+        gutterIconPath: path.join(__dirname, 'arrow_icon_next.png'), 
+        gutterIconSize: 'contain', 
+        // Light green highlight
+        backgroundColor: 'rgba(77, 255, 0, 0.1)',
+        isWholeLine: true,
     });
     // ----------------------------------------------------------
 
@@ -92,6 +102,7 @@ function createOrShowPanel() {
             // --- NEW: Handle Line Syncing ---
             else if (message.command === 'syncLine') {
                 const line = message.line;
+                const prevLine = message.prevLine;
                 // Find the editor that matches our document
                 const editor = vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === associatedDocument.uri.toString());
                
@@ -100,10 +111,15 @@ function createOrShowPanel() {
                     const range = new vscode.Range(line - 1, 0, line - 1, 0);
                    
                     // Apply decoration
-                    editor.setDecorations(highlightDecorationType, [range]);
+                    editor.setDecorations(nextDecorationType, [range]);
                    
                     // Optional: Scroll to that line so it's always visible
                     editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+                }
+                if (editor && prevLine && prevLine > 0) {
+                    const prevRange = new vscode.Range(prevLine - 1, 0, prevLine - 1, 0);
+                    editor.setDecorations(prevDecorationType, [prevRange]);
+                    editor.revealRange(prevRange, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
                 }
             }
             // --------------------------------
@@ -117,7 +133,7 @@ function createOrShowPanel() {
         currentInput = "";
         // Clear decorations when panel closes
         if (vscode.window.activeTextEditor) {
-            vscode.window.activeTextEditor.setDecorations(highlightDecorationType, []);
+            vscode.window.activeTextEditor.setDecorations(nextDecorationType, []);
         }
         clearTimeout(debounceTimer);
     }, undefined, extensionContext.subscriptions);
@@ -305,11 +321,10 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 #stepSlider { flex-grow: 1; margin: 0 10px; }
 
                 #main { display: flex; flex: 1; overflow: hidden; }
-                #codeDisplay { font-family: "Consolas", "Courier New", monospace; padding: 15px; white-space: pre; overflow-y: auto; width: 60%; border-right: 1px solid var(--vscode-sideBar-border, #333); }
+                #codeDisplay { display: none; } // Previous code: font-family: "Consolas", "Courier New", monospace; padding: 15px; white-space: pre; overflow-y: auto; width: 60%; border-right: 1px solid var(--vscode-sideBar-border, #333); }
                 #sidebar { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 150px; }
-               
-                #sidebarResizer { width: 5px; cursor: col-resize; background-color: var(--vscode-scrollbarSlider-background, #444); transition: background-color 0.2s; flex-shrink: 0; }
-                #outputResizer { height: 5px; cursor: row-resize; background-color: var(--vscode-scrollbarSlider-background, #444); transition: background-color 0.2s; flex-shrink: 0; }
+                // The following line doesn't seem to do improve the display currently
+                // #outputResizer { height: 5px; cursor: row-resize; background-color: var(--vscode-scrollbarSlider-background, #444); transition: background-color 0.2s; flex-shrink: 0; }
                 #sidebarResizer:hover, #outputResizer:hover { background-color: var(--vscode-scrollbarSlider-hoverBackground, #007acc); }
                
                 #stateContainer { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-height: 50px; }
@@ -330,7 +345,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
         </head>
         <body>
             <div id="errorDisplay"></div>
-           
+
             <div id="inputArea">
                 <div id="inputSection" style="display: ${initialShowInputBox ? 'block' : 'none'}">
                     <h4>Program Input</h4>
@@ -437,9 +452,11 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     // --- NEW: Sync with Editor ---
                     if (currentIndex >= 0 && currentIndex < trace.length) {
                         const step = trace[currentIndex];
+                        const prevLine = currentIndex > 0 ? trace[currentIndex - 1].line_no : null;
                         vscode.postMessage({
                             command: 'syncLine',
-                            line: step.line_no
+                            line: step.line_no,
+                            prevLine: prevLine
                         });
                     }
                     // -----------------------------
