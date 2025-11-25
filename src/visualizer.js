@@ -341,6 +341,24 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 #varsDisplay { display: none; }
                 .highlight-line { background-color: var(--vscode-editor-selectionBackground, rgba(255, 255, 0, 0.3)); }
                 body.loading #main, body.loading #controls { opacity: 0.5; }
+                
+                #key {
+                    padding: 10px;
+                    font-size: 14px;
+                    color: var(--vscode-editor-foreground);
+                    background-color: var(--vscode-sideBar-background);
+                    border-top: 1px solid var(--vscode-sideBar-border, #333);
+                    text-align: center;
+                }
+                #key span {
+                    display: inline-block;
+                    margin-right: 15px;
+                }
+                .arrow-icon {
+                    font-size: 40 px;
+                    font-weight: bold;
+                    margin-right: 5px;
+                }
             </style>
         </head>
         <body>
@@ -383,6 +401,11 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                         <pre id="outputContent"></pre>
                     </div>
                 </div>
+            </div>
+            
+            <div id="key">
+                <span><span class="arrow-icon" style="color: #009dff;">→</span> Just executed</span>
+                <span><span class="arrow-icon" style="color: #66d900;">→</span> Next to execute</span>
             </div>
 
             <script>
