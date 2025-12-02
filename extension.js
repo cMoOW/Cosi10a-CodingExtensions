@@ -10,6 +10,7 @@ const { sendEmail } = require('./src/send-email.js');
 const { createTicketFromEmailData } = require('./src/create-ticket.js');
 const { NoteManager } = require('./PostIt/noteManager');
 const { EmailUIManager } = require('./PostIt/emailUIManager');
+const { TicketViewer } = require('./PostIt/ticketViewer');
 // Note: supabaseClient is not needed here - it's used internally by create-ticket.js
 
 const visualizer = require('./src/visualizer.js');
@@ -51,13 +52,24 @@ function activate(context) {
 	statusBarItem.show();
 	context.subscriptions.push(statusBarItem);
 
+	// Create status bar item for tickets
+	const ticketsStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+	ticketsStatusBarItem.command = 'test.viewMyTickets';
+	ticketsStatusBarItem.text = '$(inbox) Tickets';
+	ticketsStatusBarItem.tooltip = 'Click to view your tickets and TA feedback';
+	ticketsStatusBarItem.show();
+	context.subscriptions.push(ticketsStatusBarItem);
+
 	// Initialize Note Manager with callback for status bar updates
 	const noteManager = new NoteManager(context, (notesCount) => {
 		statusBarItem.text = `$(note) ${notesCount} notes`;
 	});
 	
 	// Set initial status bar text
-	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`; 
+	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+
+	// Initialize Ticket Viewer
+	const ticketViewer = new TicketViewer(context); 
 
 	// Helper function to update status bar (now handled by callback)
 	const updateStatusBar = async () => {
@@ -90,55 +102,6 @@ function activate(context) {
 			}
 		}
 	});
-
-	// let emailCodeDisposable = vscode.commands.registerCommand('test.emailCodeSnippet', async function () {
-    //     const editor = vscode.window.activeTextEditor;
-    //     if (!editor) return;
-
-        const selection = editor.selection;
-        const selectedText = editor.document.getText(selection);
-        const documentText = editor.document.getText();
-
-        const emailUI = new EmailUIManager(context);
-        const emailList = {"Brian Shen": "brianshen@brandeis.edu", 
-                            "Apoorva Uppal": "auppal@brandeis.edu", 
-                            "Jacob Carminati": "jacobcarminati@brandeis.edu", 
-                            "SiMing Lin": "siminglin@brandeis.edu"};
-        const storedEmail = context.globalState.get(EMAIL_KEY) || '';
-
-        // Show the email editor window
-        await emailUI.showEmailEditor(selectedText, emailList, storedEmail);
-
-        // When user clicks "Send"
-        emailUI.onSend(async ({ userEmail, recipients, noteContent }) => {
-            try {
-                // Validate user email
-                if (!userEmail.endsWith('@brandeis.edu')) {
-                    vscode.window.showErrorMessage('Your email must be a valid Brandeis email address.');
-                    return;
-                }
-                // Validate recipient emails
-                const invalidEmails = recipients.filter(e => !e.endsWith('@brandeis.edu'));
-                if (invalidEmails.length > 0) {
-                    vscode.window.showErrorMessage(`Invalid Brandeis emails: ${invalidEmails.join(', ')}`);
-                    return;
-                }
-
-                // Store user email for next time
-                await context.globalState.update(EMAIL_KEY, userEmail);
-
-                // Send the actual email
-                await sendEmail(selectedText, documentText, userEmail, recipients.join(','), noteContent);
-                vscode.window.showInformationMessage('Email successfully sent!');
-
-                // Optional: Add as a note
-                await noteManager.addNote(noteContent);
-
-            } catch (error) {
-                vscode.window.showErrorMessage('Failed to send email: ' + error.message);
-            }
-        });
-    });
 
 	async function sendEmailCommandHandler(highlightedText, documentText, noteManager, editor) {
 		const panel = vscode.window.createWebviewPanel(
@@ -210,11 +173,17 @@ function activate(context) {
 		}
 	});
  
+	// View My Tickets Command
+	let viewTicketsCommand = vscode.commands.registerCommand('test.viewMyTickets', async () => {
+		await ticketViewer.viewMyTickets();
+	});
+
 	// Register all commands
 	context.subscriptions.push(viewNotesCommand);
 	context.subscriptions.push(addNoteCommand);
 	context.subscriptions.push(addNoteFromSelectionCommand);
 	context.subscriptions.push(emailCodeDisposable);
+	context.subscriptions.push(viewTicketsCommand);
 
 	// highlight TODO: Uncomment this line to enable the highlighter functionality
 	// activateHighlighter(context);

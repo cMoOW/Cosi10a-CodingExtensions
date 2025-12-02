@@ -46,6 +46,10 @@
         "title": "Add Selected Text as Note"
       },
       {
+        "command": "test.viewMyTickets",
+        "title": "View My Tickets & Feedback"
+      },
+      {
         "command": "extension.getUserEmail",
         "title": "Get User Email"
       },
