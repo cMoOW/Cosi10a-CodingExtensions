@@ -59,6 +59,7 @@ class NoteManager {
    * @param {string} options.fileName - File name (optional)
    * @param {string} options.language - Language (optional)
    */
+  // @ts-ignore Should be optional
   async addNote(message, options = {}) {
     if (message && message.trim()) {
       const newNote = {

@@ -91,6 +91,12 @@ function createOrShowPanel() {
         'pythonVisualizer', 'Python Visualizer', vscode.ViewColumn.Beside,
         { enableScripts: true, retainContextWhenHidden: true }
     );
+    
+    const iconPath = vscode.Uri.file(
+        path.join(extensionContext.extensionPath, 'src', 'arrow_icon_next.png')
+    );
+    vscode.window.showInformationMessage('Icon Path:', iconPath.toString());
+    visualizerPanel.iconPath = iconPath;
 
     associatedDocument = editor.document;
     currentInput = "";
