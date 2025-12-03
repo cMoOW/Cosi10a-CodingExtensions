@@ -1,6 +1,7 @@
 const vscode = require("vscode");
 const fs = require("fs");
 const path = require("path");
+const { createNote } = require("../src/create-note");
 
 class NoteManager {
   constructor(context, onNotesChanged = null) {
@@ -50,8 +51,15 @@ class NoteManager {
 
   /**
    * Add a new note
+   * @param {string} message - The note content
+   * @param {Object} options - Optional editor context
+   * @param {string} options.highlightedCode - Selected code (optional)
+   * @param {string} options.fullCode - Full document code (optional)
+   * @param {string} options.filePath - File path (optional)
+   * @param {string} options.fileName - File name (optional)
+   * @param {string} options.language - Language (optional)
    */
-  async addNote(message) {
+  async addNote(message, options = {}) {
     if (message && message.trim()) {
       const newNote = {
         id: Date.now(),
@@ -62,6 +70,55 @@ class NoteManager {
 
       this.notes.push(newNote);
       await this.saveNotes();
+
+      // Also save to Supabase database
+      try {
+        // Get user email from stored state
+        const getUserEmail = require("../extension").getUserEmail;
+        let userEmail = getUserEmail ? getUserEmail(this.context) : null;
+
+        // If no email stored, prompt user
+        if (!userEmail) {
+          const emailInput = await vscode.window.showInputBox({
+            prompt: "Enter your Brandeis email to save note to database",
+            placeHolder: "name@brandeis.edu",
+            validateInput: (value) => {
+              if (!value || !value.endsWith("@brandeis.edu")) {
+                return "Please enter a valid Brandeis email address";
+              }
+              return null;
+            }
+          });
+
+          if (emailInput) {
+            userEmail = emailInput;
+            // Save email for future use
+            const EMAIL_KEY = 'myExtension.userEmail';
+            await this.context.globalState.update(EMAIL_KEY, emailInput);
+          }
+        }
+
+        // Save to Supabase if we have an email
+        if (userEmail) {
+          const editor = vscode.window.activeTextEditor;
+          const noteData = {
+            studentEmail: userEmail,
+            message: message.trim(),
+            highlightedCode: options.highlightedCode || (editor ? this.getSelectedText(editor) : null),
+            fullCode: options.fullCode || (editor ? editor.document.getText() : null),
+            filePath: options.filePath || (editor ? editor.document.uri.fsPath || editor.document.fileName : null),
+            fileName: options.fileName || (editor && editor.document.fileName ? path.basename(editor.document.fileName) : null),
+            language: options.language || (editor ? editor.document.languageId : null)
+          };
+
+          await createNote(noteData);
+          console.log("Note saved to Supabase database");
+        }
+      } catch (error) {
+        console.error("Error saving note to database:", error);
+        // Don't show error to user - local save already succeeded
+        // vscode.window.showErrorMessage(`Note saved locally, but failed to save to database: ${error.message}`);
+      }
 
       vscode.window.showInformationMessage(
         ` Note added: "${message.substring(0, 30)}${
@@ -77,6 +134,18 @@ class NoteManager {
       return newNote;
     }
 
+    return null;
+  }
+
+  /**
+   * Get selected text from editor
+   */
+  getSelectedText(editor) {
+    if (!editor) return null;
+    const selection = editor.selection;
+    if (selection && !selection.isEmpty) {
+      return editor.document.getText(selection);
+    }
     return null;
   }
 
@@ -101,26 +170,8 @@ class NoteManager {
       if (message.type === "saveNote") {
         const content = message.content.trim();
         if (content) {
-          const newNote = {
-            id: Date.now(),
-            content: content,
-            timestamp: new Date().toISOString(),
-            color: await this.selectNoteColor(),
-          };
-
-          this.notes.push(newNote);
-          await this.saveNotes();
-
-          vscode.window.showInformationMessage(
-            `Note added: "${content.substring(0, 30)}${
-              content.length > 30 ? "..." : ""
-            }"`
-          );
-
-          // Refresh the active panel if it exists
-          if (this.activePanel) {
-            this.activePanel.webview.html = this.getWebviewContent();
-          }
+          // Use addNote which handles both local and Supabase save
+          await this.addNote(content);
 
           panel.dispose();
         } else {
@@ -161,26 +212,18 @@ class NoteManager {
       if (message.type === "saveNote") {
         const content = message.content.trim();
         if (content) {
-          const newNote = {
-            id: Date.now(),
-            content: content,
-            timestamp: new Date().toISOString(),
-            color: await this.selectNoteColor(),
+          // Get editor context for database save
+          const editor = vscode.window.activeTextEditor;
+          const options = {
+            highlightedCode: initialContent || (editor ? this.getSelectedText(editor) : null),
+            fullCode: editor ? editor.document.getText() : null,
+            filePath: editor ? editor.document.uri.fsPath || editor.document.fileName : null,
+            fileName: editor && editor.document.fileName ? path.basename(editor.document.fileName) : null,
+            language: editor ? editor.document.languageId : null
           };
 
-          this.notes.push(newNote);
-          await this.saveNotes();
-
-          vscode.window.showInformationMessage(
-            `Note added: "${content.substring(0, 30)}${
-              content.length > 30 ? "..." : ""
-            }"`
-          );
-
-          // Refresh the active panel if it exists
-          if (this.activePanel) {
-            this.activePanel.webview.html = this.getWebviewContent();
-          }
+          // Use addNote which handles both local and Supabase save
+          await this.addNote(content, options);
 
           panel.dispose();
         } else {

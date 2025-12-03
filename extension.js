@@ -10,7 +10,8 @@ const { sendEmail } = require('./src/send-email.js');
 const { createTicketFromEmailData } = require('./src/create-ticket.js');
 const { NoteManager } = require('./PostIt/noteManager');
 const { EmailUIManager } = require('./PostIt/emailUIManager');
-const {supabase} = require('./src/supabaseClient.js');
+const { TicketViewer } = require('./PostIt/ticketViewer');
+// Note: supabaseClient is not needed here - it's used internally by create-ticket.js
 
 const visualizer = require('./src/visualizer.js');
 const EMAIL_KEY = 'myExtension.userEmail';
@@ -51,13 +52,24 @@ function activate(context) {
 	statusBarItem.show();
 	context.subscriptions.push(statusBarItem);
 
+	// Create status bar item for tickets
+	const ticketsStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+	ticketsStatusBarItem.command = 'test.viewMyTickets';
+	ticketsStatusBarItem.text = '$(inbox) Tickets';
+	ticketsStatusBarItem.tooltip = 'Click to view your tickets and TA feedback';
+	ticketsStatusBarItem.show();
+	context.subscriptions.push(ticketsStatusBarItem);
+
 	// Initialize Note Manager with callback for status bar updates
 	const noteManager = new NoteManager(context, (notesCount) => {
 		statusBarItem.text = `$(note) ${notesCount} notes`;
 	});
 	
 	// Set initial status bar text
-	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`; 
+	statusBarItem.text = `$(note) ${noteManager.getNotesCount()} notes`;
+
+	// Initialize Ticket Viewer
+	const ticketViewer = new TicketViewer(context); 
 
 	// Helper function to update status bar (now handled by callback)
 	const updateStatusBar = async () => {
@@ -210,11 +222,17 @@ function activate(context) {
 	// 	}
 	// });
  
+	// View My Tickets Command
+	let viewTicketsCommand = vscode.commands.registerCommand('test.viewMyTickets', async () => {
+		await ticketViewer.viewMyTickets();
+	});
+
 	// Register all commands
 	context.subscriptions.push(viewNotesCommand);
 	context.subscriptions.push(addNoteCommand);
 	context.subscriptions.push(addNoteFromSelectionCommand);
 	context.subscriptions.push(emailCodeDisposable);
+	context.subscriptions.push(viewTicketsCommand);
 
 	// highlight TODO: Uncomment this line to enable the highlighter functionality
 	// activateHighlighter(context);

@@ -7,15 +7,27 @@ const path = require('path');
 // Load environment variables from .env file
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-// Initialize Supabase client
-let supabaseUrl = process.env.SUPABASE_URL;
-let supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+// Lazy-load Supabase client to avoid breaking extension activation
+let supabaseClient = null;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase credentials. Please set SUPABASE_URL and SUPABASE_ANON_KEY in .env file');
+function getSupabase() {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
+
+  // Load environment variables from .env file
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+  
+  let supabaseUrl = process.env.SUPABASE_URL;
+  let supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase credentials. Please set SUPABASE_URL and SUPABASE_ANON_KEY in .env file');
+  }
+
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  return supabaseClient;
 }
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
  * Creates a ticket in Supabase database
@@ -67,6 +79,7 @@ async function createTicket(ticketData) {
   };
 
   // Insert ticket into Supabase
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from('tickets')
     .insert([ticket])
