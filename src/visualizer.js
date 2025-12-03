@@ -13,6 +13,8 @@ let extensionContext = undefined;
 // --- NEW: Decoration Type for the Editor Highlight ---
 let prevDecorationType = undefined;
 let nextDecorationType = undefined;
+// No arrows decoration:
+let noArrowDecorationType = undefined;
 
 // --- Helpers ---
 function checkCodeForInput(sourceCode) {
@@ -47,8 +49,13 @@ function activate(context) {
         backgroundColor: 'rgba(77, 255, 0, 0.1)',
         isWholeLine: true,
     });
+    noArrowDecorationType = vscode.window.createTextEditorDecorationType({
+        // Light green highlight
+        backgroundColor: 'rgba(77, 255, 0, 0.1)',
+        isWholeLine: true,
+    });
     // ----------------------------------------------------------
-
+    
     let startCommand = vscode.commands.registerCommand('visualizer.start', createOrShowPanel);
     let changeListener = vscode.workspace.onDidChangeTextDocument(onDocumentChange);
     let tabChangeListener = vscode.window.onDidChangeActiveTextEditor(editor => {
@@ -67,6 +74,9 @@ function activate(context) {
 
 function createOrShowPanel() {
     const editor = vscode.window.activeTextEditor;
+    let curr = 0;
+    let prev = undefined;
+    let arrowsEnabled = true; // Default show arrows
     if (!editor || editor.document.languageId !== 'python') {
         vscode.window.showErrorMessage('Please open a Python file to visualize.');
         return;
@@ -99,32 +109,63 @@ function createOrShowPanel() {
                 if (message.seed) currentSeed = message.seed;
                 runTracerAndPostUpdate();
             }
-            // --- NEW: Handle Line Syncing ---
+            // --- Handle Line Syncing ---
             else if (message.command === 'syncLine') {
                 const line = message.line;
                 const prevLine = message.prevLine;
                 // Find the editor that matches our document
                 const editor = vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === associatedDocument.uri.toString());
-               
+
                 if (editor && line > 0) {
+                    curr = line - 1;
                     // VS Code uses 0-based indexing, Python trace is 1-based
                     const range = new vscode.Range(line - 1, 0, line - 1, 0);
-                   
-                    // Apply decoration
-                    editor.setDecorations(nextDecorationType, [range]);
-                   
-                    // Optional: Scroll to that line so it's always visible
+                    // Apply the appropriate decoration based on whether arrows are enabled
+                    if (arrowsEnabled) {
+                        editor.setDecorations(nextDecorationType, [range]);
+                    } else {
+                        editor.setDecorations(noArrowDecorationType, [range]);
+                    }
+                    // Optionally, scroll to that line so it's always visible
                     editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
                 }
+                
                 if (editor && prevLine && prevLine > 0) {
-                    const prevRange = new vscode.Range(prevLine - 1, 0, prevLine - 1, 0);
-                    editor.setDecorations(prevDecorationType, [prevRange]);
-                    editor.revealRange(prevRange, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+                    prev = prevLine - 1;
+                    if (arrowsEnabled) {
+                        const prevRange = new vscode.Range(prevLine - 1, 0, prevLine - 1, 0);
+                        
+                        // Apply the appropriate decoration based on whether arrows are enabled
+                        editor.setDecorations(prevDecorationType, [prevRange]);
+                    }
                 }
             }
-            // --------------------------------
+            // --- Handle Arrows Toggle ---
+            else if (message.command === 'toggleArrows') {
+                arrowsEnabled = message.enabled;  // Update the arrows state
+                
+                // Optionally, clear the current decorations if arrows are disabled
+                if (editor) {
+                    if (!arrowsEnabled) {
+                        // Clear both arrow decorations when disabled
+                        editor.setDecorations(prevDecorationType, []);
+                        editor.setDecorations(nextDecorationType, []);
+                        const range = new vscode.Range(curr, 0, curr, 0);
+                        editor.setDecorations(noArrowDecorationType, [range]);
+                    } else {
+                        editor.setDecorations(noArrowDecorationType, []);
+                        const range = new vscode.Range(curr, 0, curr, 0);
+                        editor.setDecorations(nextDecorationType, [range]);
+                        if (prev) {
+                            const range = new vscode.Range(prev, 0, prev, 0);
+                            editor.setDecorations(prevDecorationType, [range]);
+                        }
+                    }
+                }
+            }
         },
-        undefined, extensionContext.subscriptions
+        undefined,
+        extensionContext.subscriptions
     );
 
     visualizerPanel.onDidDispose(() => {
@@ -396,8 +437,54 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 }
 
                 #varsDisplay { display: none; }
-                #key { padding: 5px; font-size: 11px; color: var(--vscode-descriptionForeground); background-color: var(--vscode-sideBar-background); border-top: 1px solid var(--vscode-sideBar-border, #333); text-align: center; flex-shrink: 0; }
-                #key span { display: inline-block; margin-right: 10px; }
+                /* --- Key Section --- */
+                #key {
+                    padding: 5px;
+                    font-size: 11px;
+                    color: var(--vscode-descriptionForeground);
+                    background-color: var(--vscode-sideBar-background);
+                    border-top: 1px solid var(--vscode-sideBar-border, #333);
+                    text-align: center;
+                    flex-shrink: 0;
+                    display: flex;
+                    justify-content: space-between; /* Distribute space between arrows and checkbox */
+                    align-items: center;
+                }
+
+                #key span {
+                    display: inline-block;
+                    margin-right: 10px;
+                }
+
+                #key #toggleArrows {
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end; /* Align checkbox to the right */
+                    flex-grow: 1; /* Allow it to take remaining space */
+                }
+
+                #key label {
+                    cursor: pointer;
+                    font-size: 12px;
+                    padding-left: 5px;
+                }
+
+                .arrow-icon {
+                    font-size: 20px; /* Increase size of arrows */
+                    font-weight: bold;
+                    margin-right: 3px;
+                    position: relative;
+                    top: 1px;
+                }
+
+                #key input[type="checkbox"] {
+                    margin-right: 5px;
+                }
+
+                #key input[type="checkbox"]:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
                 .arrow-icon { font-size: 14px; font-weight: bold; margin-right: 3px; position: relative; top: 1px;}
                 body.loading #main, body.loading #controls { opacity: 0.5; }
             </style>
@@ -444,8 +531,14 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
             </div>
             
             <div id="key">
-                <span><span class="arrow-icon" style="color: #009dff;">→</span> Just executed</span>
-                <span><span class="arrow-icon" style="color: #66d900;">→</span> Next to execute</span>
+                <div>
+                    <span><span class="arrow-icon" style="color: #009dff;">→</span> Just executed</span>
+                    <span><span class="arrow-icon" style="color: #66d900;">→</span> Next to execute</span>
+                </div>
+                <div id="toggleArrows">
+                    <input type="checkbox" id="arrowsCheckbox" checked />
+                    <label for="arrowsCheckbox">Display arrows</label>
+                </div>
             </div>
 
             <script>
@@ -484,6 +577,26 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 const outputContent = document.getElementById('outputContent');
                 
                 const MAX_VAR_LENGTH = 80;
+
+                document.getElementById('arrowsCheckbox').addEventListener('change', function() {
+                    const isChecked = this.checked;
+
+                    // Disable or enable the arrows functionality
+                    const toggleArrowsButton = document.getElementById('toggleArrows');
+                    const arrowsEnabled = isChecked;
+
+                    if (arrowsEnabled) {
+                        toggleArrowsButton.setAttribute('data-arrows-enabled', 'true');
+                    } else {
+                        toggleArrowsButton.setAttribute('data-arrows-enabled', 'false');
+                    }
+
+                    // Notify VS Code to update the arrows visibility
+                    vscode.postMessage({
+                        command: 'toggleArrows',
+                        enabled: arrowsEnabled
+                    });
+                });
 
                 // --- IN-PLACE EXPANSION LOGIC ---
                 document.body.addEventListener('click', function(event) {
