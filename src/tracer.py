@@ -56,7 +56,8 @@ def tracer(frame, event, arg):
         
         return tracer 
     
-    if event == 'line' or event == 'return':
+
+    if event == 'line': 
         output = redirected_stdout.getvalue()
         redirected_stdout.seek(0)
         redirected_stdout.truncate(0)
@@ -93,7 +94,6 @@ if __name__ == "__main__":
     EXIT_CODE_RUNTIME_ERROR = 1
     EXIT_CODE_SYNTAX_ERROR = 2
 
-    # We will store the exit code here and exit at the very end
     final_exit_code = EXIT_CODE_SUCCESS
 
     if len(sys.argv) < 3:
@@ -132,7 +132,6 @@ if __name__ == "__main__":
         try:
             main_code_object = compile(script_content, script_to_run, 'exec')
         except (SyntaxError, IndentationError, TabError) as e:
-            # Syntax errors are fatal immediately (cannot trace them)
             print(f"Syntax Error: {e}", file=sys.stderr)
             sys.exit(EXIT_CODE_SYNTAX_ERROR)
             
@@ -141,37 +140,22 @@ if __name__ == "__main__":
         exec(main_code_object, scope, scope)
         
     except Exception as e:
-        # --- THIS IS THE CHANGE ---
-        # We caught a runtime error.
-        # 1. Restore stdout so we can print the error to the real console (stderr)
         sys.stdout = original_stdout 
         sys.stdin = original_stdin 
-        
-        # 2. Print the error message for the Visualizer to capture
         print(f"Error during script execution: {e}", file=sys.stderr)
-        
-        # 3. Set the exit code to ERROR, but DO NOT EXIT YET.
-        #    We still want to print the JSON trace below.
         final_exit_code = EXIT_CODE_RUNTIME_ERROR
-        # --------------------------
         
     finally:
-        # Restore everything
         sys.settrace(None)
-        # If we didn't crash, these might still need restoring
         if sys.stdout != original_stdout:
             sys.stdout = original_stdout
         if sys.stdin != original_stdin:
             sys.stdin = original_stdin 
     
-    # Get any final output pending in the buffer
     final_output = redirected_stdout.getvalue()
     
-    # Add final state to the last step
     if execution_trace:
         execution_trace[-1]['output'] += final_output
-        
-        # Only try to grab final variables if scope is valid (might not be on crash)
         try:
             final_global_vars = safe_serialize(scope)
             execution_trace[-1]['global_vars'] = final_global_vars
@@ -180,8 +164,5 @@ if __name__ == "__main__":
         except:
             pass
 
-    # Print the trace (even if it crashed partway through!)
     print(json.dumps(execution_trace, indent=2))
-    
-    # Exit with the correct code (0 for success, 1 for crash)
     sys.exit(final_exit_code)

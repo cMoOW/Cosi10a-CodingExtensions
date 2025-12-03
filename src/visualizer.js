@@ -285,15 +285,23 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     color: var(--vscode-editor-foreground);
                     background-color: var(--vscode-editor-background);
                 }
-                h4 { margin-top: 0; }
+                
+                /* Compact Headers */
+                h4 { 
+                    margin: 8px 0 4px 0; 
+                    font-size: 11px; 
+                    text-transform: uppercase; 
+                    opacity: 0.7; 
+                    letter-spacing: 0.5px;
+                }
                 
                 #errorDisplay { padding: 10px; background-color: #5c2121; border-bottom: 1px solid var(--vscode-sideBar-border, #333); }
-                #errorDisplay h4 { margin: 0 0 5px 0; color: #ffcccc; }
+                #errorDisplay h4 { margin: 0 0 5px 0; color: #ffcccc; opacity: 1; }
                 #errorDisplay pre { white-space: pre-wrap; color: white; margin: 0; }
                 
                 /* --- Config Area --- */
                 #inputArea { padding: 10px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); }
-                #inputSection h4 { margin: 0 0 5px 0; }
+                #inputSection h4 { margin: 0 0 5px 0; opacity: 1; font-size: 1em; text-transform: none; }
                 #inputBox { 
                     width: calc(100% - 10px); 
                     font-family: "Consolas", "Courier New", monospace; 
@@ -311,10 +319,11 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     background-color: var(--vscode-button-background);
                     color: var(--vscode-button-foreground);
                     border: none; 
-                    padding: 6px 12px; 
+                    padding: 4px 12px; /* Smaller padding */
                     border-radius: 2px; 
                     cursor: pointer; 
                     font-family: var(--vscode-font-family);
+                    font-size: 12px;
                 }
                 button:hover { background-color: var(--vscode-button-hoverBackground); }
                 button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -325,38 +334,31 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 #rerunNewBtn:hover { background-color: #0bc90b; }
                 #rerunSameBtn:hover { background-color: #0098ff; }
 
-                /* --- Playback Controls --- */
-                #controls { padding: 10px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); display: flex; align-items: center; flex-shrink: 0; }
-                #stepLabel { margin: 0 10px; min-width: 100px; text-align: right; }
+                /* --- Controls --- */
+                #controls { padding: 5px 10px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); display: flex; align-items: center; flex-shrink: 0; }
+                #stepLabel { margin: 0 10px; min-width: 80px; text-align: right; font-size: 12px; }
                 #stepSlider { flex-grow: 1; margin: 0 10px; }
 
                 /* --- Main Layout --- */
-                #main { 
-                    display: flex; 
-                    flex: 1; 
-                    overflow: hidden; 
-                    /* No split view anymore, just the one main column */
-                }
+                #main { display: flex; flex: 1; overflow: hidden; }
                 
                 #sidebar { 
-                    flex: 1; /* Takes full width */
+                    flex: 1; 
                     display: flex; 
                     flex-direction: column; 
                     overflow: hidden; 
                     width: 100%;
                 }
                 
-                /* --- Output Resizer (Height Only) --- */
+                /* --- Resizer --- */
                 #outputResizer { 
-                    height: 5px; 
+                    height: 4px; 
                     cursor: row-resize; 
                     background-color: var(--vscode-scrollbarSlider-background, #444); 
                     transition: background-color 0.2s; 
                     flex-shrink: 0; 
                 }
-                #outputResizer:hover { 
-                    background-color: var(--vscode-scrollbarSlider-hoverBackground, #007acc); 
-                }
+                #outputResizer:hover { background-color: var(--vscode-scrollbarSlider-hoverBackground, #007acc); }
                 
                 /* --- Panels --- */
                 #stateContainer { 
@@ -366,31 +368,65 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     flex-direction: column; 
                     min-height: 50px; 
                 }
-                #varsDisplay, #globalsDisplay { padding: 15px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); }
+                
+                /* Compact Panel Padding */
+                #varsDisplay, #globalsDisplay { 
+                    padding: 5px 10px; 
+                    border-bottom: 1px solid var(--vscode-sideBar-border, #333); 
+                }
                 #stateContainer > div:last-child { border-bottom: none; }
                 
                 #outputDisplay { 
-                    height: 30%; /* Initial height */
-                    padding: 15px; 
+                    height: 30%; 
+                    padding: 10px; 
                     overflow-y: auto; 
                     font-family: "Consolas", "Courier New", monospace; 
                     border-top: 1px solid var(--vscode-sideBar-border, #333); 
                     flex-shrink: 0; 
+                    font-size: 12px;
                 }
                 #outputContent { white-space: pre-wrap; }
                 
-                /* --- Tables --- */
-                #varsTable, #globalsTable { width: 100%; border-collapse: collapse; table-layout: fixed; }
-                #varsTable th, #globalsTable th { text-align: left; padding: 4px 8px; border-bottom: 2px solid var(--vscode-sideBar-border, #333); }
-                #varsTable td, #globalsTable td { padding: 4px 8px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); vertical-align: top; word-wrap: break-word; white-space: pre-wrap; }
-                #varsTable td:first-child, #globalsTable td:first-child { width: 35%; font-weight: bold; }
-                #varsTable tr:last-child td, #globalsTable tr:last-child td { border-bottom: none; }
+                /* --- Compact Variable Tables --- */
+                .compact-table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    table-layout: fixed; 
+                    font-size: 12px; /* Smaller font */
+                }
+                
+                /* Variable Name Column */
+                .compact-table td:first-child { 
+                    width: 30%; 
+                    color: var(--vscode-symbolIcon-variableForeground, #75beff); /* VS Code Blue */
+                    font-weight: 600;
+                    vertical-align: top;
+                    padding: 2px 5px 2px 0;
+                    border-right: 1px solid var(--vscode-tree-indentGuidesStroke, #333);
+                }
+                
+                /* Value Column */
+                .compact-table td:last-child { 
+                    padding: 2px 0 2px 8px;
+                    vertical-align: top;
+                    word-wrap: break-word;
+                    white-space: pre-wrap;
+                    color: var(--vscode-debugTokenExpression-string, #ce9178); /* VS Code String colorish */
+                    font-family: "Consolas", "Courier New", monospace;
+                }
+                
+                /* Row borders */
+                .compact-table tr {
+                    border-bottom: 1px solid var(--vscode-tree-indentGuidesStroke, #2a2a2a);
+                }
+                .compact-table tr:last-child { border-bottom: none; }
+
                 #varsDisplay { display: none; }
                 
                 /* --- Key/Legend --- */
-                #key { padding: 10px; font-size: 14px; color: var(--vscode-editor-foreground); background-color: var(--vscode-sideBar-background); border-top: 1px solid var(--vscode-sideBar-border, #333); text-align: center; flex-shrink: 0; }
-                #key span { display: inline-block; margin-right: 15px; }
-                .arrow-icon { font-size: 16px; font-weight: bold; margin-right: 5px; }
+                #key { padding: 5px; font-size: 11px; color: var(--vscode-descriptionForeground); background-color: var(--vscode-sideBar-background); border-top: 1px solid var(--vscode-sideBar-border, #333); text-align: center; flex-shrink: 0; }
+                #key span { display: inline-block; margin-right: 10px; }
+                .arrow-icon { font-size: 14px; font-weight: bold; margin-right: 3px; position: relative; top: 1px;}
                 
                 body.loading #main, body.loading #controls { opacity: 0.5; }
             </style>
@@ -409,8 +445,8 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 </div>
 
                 <div id="randomControls" style="display: ${initialHasRandomness ? 'flex' : 'none'}">
-                    <button id="rerunNewBtn" title="Run with a fresh random seed (Different outcome)">Re-run (New Outcome)</button>
-                    <button id="rerunSameBtn" title="Run with the same random seed (Same outcome)">Re-run (Same Outcome)</button>
+                    <button id="rerunNewBtn" title="Run with a fresh random seed">Re-run (New Outcome)</button>
+                    <button id="rerunSameBtn" title="Run with the same random seed">Re-run (Same Outcome)</button>
                 </div>
             </div>
             
@@ -427,9 +463,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                         <div id="globalsDisplay"></div>
                         <div id="varsDisplay"></div>
                     </div>
-                    
                     <div id="outputResizer"></div>
-
                     <div id="outputDisplay">
                         <h4>Program Output</h4>
                         <pre id="outputContent"></pre>
@@ -470,7 +504,6 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 const stepLabel = document.getElementById('stepLabel');
                 const stepSlider = document.getElementById('stepSlider');
                 
-                // Layout Elements
                 const sidebar = document.getElementById('sidebar');
                 const stateContainer = document.getElementById('stateContainer');
                 const globalsDisplay = document.getElementById('globalsDisplay');
@@ -491,8 +524,6 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     if (isResizingHeight) {
                         const sidebarRect = sidebar.getBoundingClientRect();
                         const newOutputHeight = sidebarRect.bottom - e.clientY;
-                        
-                        // Constraints: Min height 50px for output, min height 50px for vars
                         if (newOutputHeight > 30 && newOutputHeight < sidebarRect.height - 50) { 
                             outputDisplay.style.height = newOutputHeight + 'px'; 
                         }
@@ -505,7 +536,6 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                         document.body.style.cursor = 'default'; 
                     }
                 });
-                // --- END RESIZER LOGIC ---
                 
                 function render() {
                     prevBtn.disabled = (currentIndex <= 0);
@@ -513,7 +543,6 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     stepLabel.textContent = \`Step: \${currentIndex + 1} / \${trace.length}\`;
                     if (stepSlider) { stepSlider.value = currentIndex; }
                     
-                    // Sync with Editor (This is critical now that we removed codeDisplay)
                     if (currentIndex >= 0 && currentIndex < trace.length) {
                         const step = trace[currentIndex];
                         const prevLine = currentIndex > 0 ? trace[currentIndex - 1].line_no : null;
@@ -529,11 +558,11 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     const step = trace[currentIndex];
                     const funcName = step.func_name;
                     
-                    // Render Globals
+                    // Render Globals (Compact)
                     let globalsHtml = '<h4>Global Variables</h4>';
                     const globalVars = step.global_vars;
                     if (globalVars && Object.keys(globalVars).length > 0) {
-                        globalsHtml += '<table id="globalsTable"><thead><tr><th>Variable</th><th>Value</th></tr></thead><tbody>';
+                        globalsHtml += '<table class="compact-table"><tbody>';
                         for (const key in globalVars) {
                             if (key.startsWith('__') || key === 'MockStdin' || key === 'safe_serialize' || key === 'tracer' || key === 'EchoingStringIO' || key === 'random') { continue; }
                             const value = globalVars[key];
@@ -542,16 +571,16 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                             globalsHtml += \`<tr><td>\${safeKey}</td><td>\${safeValue}</td></tr>\`;
                         }
                         globalsHtml += '</tbody></table>';
-                    } else { globalsHtml += '<span>No global variables in this step.</span>'; }
+                    } else { globalsHtml += '<span style="font-size:11px; opacity:0.6;">No global variables.</span>'; }
                     globalsDisplay.innerHTML = globalsHtml;
 
-                    // Render Locals
+                    // Render Locals (Compact)
                     if (funcName !== '<module>') {
                         varsDisplay.style.display = 'block';
-                        let varsHtml = '<h4>Local Variables</h4>';
+                        let varsHtml = '<h4>Local Variables (' + funcName + ')</h4>';
                         const localVars = step.local_vars;
                         if (localVars && Object.keys(localVars).length > 0) {
-                            varsHtml += '<table id="varsTable"><thead><tr><th>Variable</th><th>Value</th></tr></thead><tbody>';
+                            varsHtml += '<table class="compact-table"><tbody>';
                             for (const key in localVars) {
                                 const value = localVars[key];
                                 const safeKey = key.replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -559,7 +588,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                                 varsHtml += \`<tr><td>\${safeKey}</td><td>\${safeValue}</td></tr>\`;
                             }
                             varsHtml += '</tbody></table>';
-                        } else { varsHtml += '<span>No local variables in this step.</span>'; }
+                        } else { varsHtml += '<span style="font-size:11px; opacity:0.6;">No local variables.</span>'; }
                         varsDisplay.innerHTML = varsHtml;
                     } else { varsDisplay.style.display = 'none'; varsDisplay.innerHTML = ''; }
 
