@@ -181,6 +181,8 @@ function createOrShowPanel() {
         // Clear decorations when panel closes
         if (vscode.window.activeTextEditor) {
             vscode.window.activeTextEditor.setDecorations(nextDecorationType, []);
+            vscode.window.activeTextEditor.setDecorations(prevDecorationType, []);
+            vscode.window.activeTextEditor.setDecorations(noArrowDecorationType, []);
         }
         clearTimeout(debounceTimer);
     }, undefined, extensionContext.subscriptions);
