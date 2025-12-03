@@ -70,19 +70,22 @@ class EmailUIManager {
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
           padding: 15px;
-          background: #1e1e1e;
+          background: var(--vscode-editor-background);
           display: flex;
           justify-content: center;
           align-items: flex-start;
           margin: 0;
           height: 100vh;
           overflow: hidden;
+          color: var(--vscode-editor-foreground);
         }
+
+        /* Updated to match inline-editor style */
         .floating-editor {
-          background: #2d2d30;
+          background: var(--vscode-sideBar-background);
+          border: 1px solid var(--vscode-panel-border);
           border-radius: 6px;
           padding: 15px;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.3);
           width: 100%;
           height: 100%;
           display: flex;
@@ -90,86 +93,101 @@ class EmailUIManager {
           box-sizing: border-box;
           max-width: none;
           padding-bottom: 25px;
+          color: var(--vscode-editor-foreground);
         }
+
         h2 {
-          color: #cccccc;
+          color: var(--vscode-editor-foreground);
           font-size: 18px;
           font-weight: 600;
           margin-bottom: 12px;
         }
+
         label {
-          color: #cccccc;
+          color: var(--vscode-editor-foreground);
           font-weight: 500;
           display: block;
           margin-bottom: 6px;
         }
+
         input[type="email"], textarea {
           width: 100%;
           padding: 10px;
           border-radius: 4px;
-          border: 1px solid #3e3e42;
-          background: #1e1e1e;
-          color: #cccccc;
+          border: 1px solid var(--vscode-input-border);
+          background: var(--vscode-input-background);
+          color: var(--vscode-input-foreground);
           font-size: 14px;
           line-height: 1.4;
-          margin-bottom: 0px;
+          margin-bottom: 0;
           box-sizing: border-box;
         }
+
         textarea {
           flex: 1;
           min-height: 160px;
           font-family: 'Courier New', monospace;
           resize: none;
         }
+
         .multiselect-container {
           position: relative;
           margin-bottom: 12px;
         }
+
         .select-box {
-          background: #1e1e1e;
-          border: 1px solid #3e3e42;
+          background: var(--vscode-dropdown-background);
+          border: 1px solid var(--vscode-dropdown-border);
           padding: 10px;
           border-radius: 4px;
-          color: #cccccc;
+          color: var(--vscode-dropdown-foreground);
           cursor: pointer;
           user-select: none;
           overflow: hidden;
           white-space: nowrap;
           text-overflow: ellipsis;
         }
+
         .placeholder-text {
-          color: #888;
+          color: var(--vscode-descriptionForeground);
         }
+
         .dropdown-options {
           display: none;
           position: absolute;
           top: 100%;
           left: 0;
           width: 100%;
-          background: #3a3a3a;
-          border: 1px solid #74B9FF;
+          background: var(--vscode-dropdown-background);
+          border: 1px solid var(--vscode-focusBorder);
           border-radius: 0 0 4px 4px;
           max-height: 150px;
           overflow-y: auto;
           z-index: 10;
         }
+
         .dropdown-options.show {
           display: block;
         }
+
         .dropdown-option {
           display: block;
           padding: 8px 10px;
           cursor: pointer;
+          color: var(--vscode-dropdown-foreground);
         }
+
         .dropdown-option:hover {
-          background: #5aa0e6;
+          background: var(--vscode-list-hoverBackground);
         }
+
         .editor-buttons {
           display: flex;
           gap: 10px;
           justify-content: flex-end;
           margin-top: 10px;
         }
+
         button {
           border: none;
           border-radius: 4px;
@@ -179,19 +197,23 @@ class EmailUIManager {
           transition: background 0.2s ease;
           font-size: 12px;
         }
+
         .send-btn {
-          background: #0e639c;
-          color: white;
+          background: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
         }
+
         .send-btn:hover {
-          background: #1177bb;
+          background: var(--vscode-button-hoverBackground);
         }
+
         .cancel-btn {
-          background: #5a5a5a;
-          color: white;
+          background: var(--vscode-button-secondaryBackground);
+          color: var(--vscode-button-secondaryForeground);
         }
+
         .cancel-btn:hover {
-          background: #6a6a6a;
+          background: var(--vscode-button-secondaryHoverBackground);
         }
       </style>
     </head>

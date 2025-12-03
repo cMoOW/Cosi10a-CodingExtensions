@@ -59,6 +59,7 @@ class NoteManager {
    * @param {string} options.fileName - File name (optional)
    * @param {string} options.language - Language (optional)
    */
+  // @ts-ignore Should be optional
   async addNote(message, options = {}) {
     if (message && message.trim()) {
       const newNote = {
@@ -771,98 +772,114 @@ Sent from VS Code Post-It Extension
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Quick Note</title>
             <style>
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    padding: 15px;
-                    background: #1e1e1e;
-                    margin: 0;
-                    height: 100vh;
-                    overflow: hidden;
-                }
-                .inline-editor {
-                    background: #2d2d30;
-                    border: 1px solid #3e3e42;
-                    border-radius: 6px;
-                    padding: 15px;
-                    height: calc(100vh - 30px);
-                    display: flex;
-                    flex-direction: column;
-                }
-                .editor-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 10px;
-                    padding-bottom: 8px;
-                    border-bottom: 1px solid #3e3e42;
-                }
-                .editor-title {
-                    color: #cccccc;
-                    font-size: 18px;
-                    font-weight: 600;
-                    margin: 0;
-                }
-                .close-btn {
-                    background: none;
-                    border: none;
-                    color: #cccccc;
-                    cursor: pointer;
-                    font-size: 16px;
-                    padding: 2px 6px;
-                    border-radius: 3px;
-                }
-                .close-btn:hover {
-                    background: #3e3e42;
-                }
-                .editor-textarea {
-                    flex: 1;
-                    width: 100%;
-                    padding: 10px;
-                    border: 1px solid #3e3e42;
-                    border-radius: 4px;
-                    background: #1e1e1e;
-                    color: #cccccc;
-                    font-family: 'Courier New', monospace;
-                    font-size: 13px;
-                    line-height: 1.4;
-                    resize: none;
-                    outline: none;
-                    box-sizing: border-box;
-                }
-                .editor-textarea:focus {
-                    border-color: #007acc;
-                }
-                .editor-buttons {
-                    display: flex;
-                    gap: 8px;
-                    margin-top: 10px;
-                    margin-bottom: 10px;
-                    justify-content: flex-end;
-                }
-                .save-btn, .cancel-btn {
-                    padding: 6px 12px;
-                    border: none;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 12px;
-                    font-weight: 600;
-                    transition: all 0.2s ease;
-                }
-                .save-btn {
-                    background: #0e639c;
-                    color: white;
-                }
-                .save-btn:hover {
-                    background: #1177bb;
-                }
-                .cancel-btn {
-                    background: #5a5a5a;
-                    color: white;
-                }
-                .cancel-btn:hover {
-                    background: #6a6a6a;
-                }
-            </style>
+              body {
+                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                  padding: 15px;
+                  background: var(--vscode-editor-background);
+                  margin: 0;
+                  height: 100vh;
+                  overflow: hidden;
+                  color: var(--vscode-editor-foreground);
+              }
+
+              .inline-editor {
+                  background: var(--vscode-sideBar-background);
+                  border: 1px solid var(--vscode-panel-border);
+                  border-radius: 6px;
+                  padding: 15px;
+                  height: calc(100vh - 30px);
+                  display: flex;
+                  flex-direction: column;
+                  box-sizing: border-box;
+                  color: var(--vscode-editor-foreground);
+              }
+
+              .editor-header {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 10px;
+                  padding-bottom: 8px;
+                  border-bottom: 1px solid var(--vscode-panel-border);
+              }
+
+              .editor-title {
+                  color: var(--vscode-editor-foreground);
+                  font-size: 18px;
+                  font-weight: 600;
+                  margin: 0;
+              }
+
+              .close-btn {
+                  background: none;
+                  border: none;
+                  color: var(--vscode-editor-foreground);
+                  cursor: pointer;
+                  font-size: 16px;
+                  padding: 2px 6px;
+                  border-radius: 3px;
+              }
+
+              .close-btn:hover {
+                  background: var(--vscode-toolbar-hoverBackground);
+              }
+
+              .editor-textarea {
+                  flex: 1;
+                  width: 100%;
+                  padding: 10px;
+                  border: 1px solid var(--vscode-input-border);
+                  border-radius: 4px;
+                  background: var(--vscode-editor-background);
+                  color: var(--vscode-editor-foreground);
+                  font-family: 'Courier New', monospace;
+                  font-size: 13px;
+                  line-height: 1.4;
+                  resize: none;
+                  outline: none;
+                  box-sizing: border-box;
+              }
+
+              .editor-textarea:focus {
+                  border-color: var(--vscode-focusBorder);
+              }
+
+              .editor-buttons {
+                  display: flex;
+                  gap: 8px;
+                  margin-top: 10px;
+                  margin-bottom: 10px;
+                  justify-content: flex-end;
+              }
+
+              .save-btn, .cancel-btn {
+                  padding: 6px 12px;
+                  border: none;
+                  border-radius: 4px;
+                  cursor: pointer;
+                  font-size: 12px;
+                  font-weight: 600;
+                  transition: all 0.2s ease;
+              }
+
+              .save-btn {
+                  background: var(--vscode-button-background);
+                  color: var(--vscode-button-foreground);
+              }
+
+              .save-btn:hover {
+                  background: var(--vscode-button-hoverBackground);
+              }
+
+              .cancel-btn {
+                  background: var(--vscode-button-secondaryBackground);
+                  color: var(--vscode-button-secondaryForeground);
+              }
+
+              .cancel-btn:hover {
+                  background: var(--vscode-button-secondaryHoverBackground);
+              }
+          </style>
         </head>
         <body>
             <div class="inline-editor">
