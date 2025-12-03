@@ -266,6 +266,12 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
     const safeErrorData = JSON.stringify(errorData || null);
     const safeCurrentInputs = JSON.stringify(currentInputs);
     
+    // Logic: Only show the main container if we have inputs OR randomness
+    const showConfigArea = initialShowInputBox || initialHasRandomness;
+    
+    // Logic: Only show standard re-run if we have inputs BUT NO randomness
+    const showStandardBtn = initialShowInputBox && !initialHasRandomness;
+
     return `
         <!DOCTYPE html>
         <html lang="en">
@@ -285,15 +291,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     color: var(--vscode-editor-foreground);
                     background-color: var(--vscode-editor-background);
                 }
-                
-                /* Compact Headers */
-                h4 { 
-                    margin: 8px 0 4px 0; 
-                    font-size: 11px; 
-                    text-transform: uppercase; 
-                    opacity: 0.7; 
-                    letter-spacing: 0.5px;
-                }
+                h4 { margin-top: 0; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; opacity: 0.7; }
                 
                 #errorDisplay { padding: 10px; background-color: #5c2121; border-bottom: 1px solid var(--vscode-sideBar-border, #333); }
                 #errorDisplay h4 { margin: 0 0 5px 0; color: #ffcccc; opacity: 1; }
@@ -311,15 +309,13 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     margin-bottom: 5px; 
                 }
                 
-                /* --- Buttons --- */
-                #randomControls { display: flex; gap: 10px; margin-top: 8px; }
-                #standardControls { display: flex; margin-top: 8px; }
+                #randomControls, #standardControls { display: flex; gap: 10px; margin-top: 8px; }
                 
                 button { 
                     background-color: var(--vscode-button-background);
                     color: var(--vscode-button-foreground);
                     border: none; 
-                    padding: 4px 12px; /* Smaller padding */
+                    padding: 4px 12px; 
                     border-radius: 2px; 
                     cursor: pointer; 
                     font-family: var(--vscode-font-family);
@@ -341,106 +337,78 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
 
                 /* --- Main Layout --- */
                 #main { display: flex; flex: 1; overflow: hidden; }
-                
-                #sidebar { 
-                    flex: 1; 
-                    display: flex; 
-                    flex-direction: column; 
-                    overflow: hidden; 
-                    width: 100%;
-                }
+                #sidebar { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
                 
                 /* --- Resizer --- */
-                #outputResizer { 
-                    height: 4px; 
-                    cursor: row-resize; 
-                    background-color: var(--vscode-scrollbarSlider-background, #444); 
-                    transition: background-color 0.2s; 
-                    flex-shrink: 0; 
-                }
+                #outputResizer { height: 4px; cursor: row-resize; background-color: var(--vscode-scrollbarSlider-background, #444); transition: background-color 0.2s; flex-shrink: 0; }
                 #outputResizer:hover { background-color: var(--vscode-scrollbarSlider-hoverBackground, #007acc); }
                 
                 /* --- Panels --- */
-                #stateContainer { 
-                    flex: 1; 
-                    overflow-y: auto; 
-                    display: flex; 
-                    flex-direction: column; 
-                    min-height: 50px; 
-                }
-                
-                /* Compact Panel Padding */
-                #varsDisplay, #globalsDisplay { 
-                    padding: 5px 10px; 
-                    border-bottom: 1px solid var(--vscode-sideBar-border, #333); 
-                }
+                #stateContainer { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-height: 50px; }
+                #varsDisplay, #globalsDisplay { padding: 5px 10px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); }
                 #stateContainer > div:last-child { border-bottom: none; }
                 
-                #outputDisplay { 
-                    height: 30%; 
-                    padding: 10px; 
-                    overflow-y: auto; 
-                    font-family: "Consolas", "Courier New", monospace; 
-                    border-top: 1px solid var(--vscode-sideBar-border, #333); 
-                    flex-shrink: 0; 
-                    font-size: 12px;
-                }
+                #outputDisplay { height: 30%; padding: 10px; overflow-y: auto; font-family: "Consolas", "Courier New", monospace; border-top: 1px solid var(--vscode-sideBar-border, #333); flex-shrink: 0; font-size: 12px; }
                 #outputContent { white-space: pre-wrap; }
                 
-                /* --- Compact Variable Tables --- */
-                .compact-table { 
-                    width: 100%; 
-                    border-collapse: collapse; 
-                    table-layout: fixed; 
-                    font-size: 12px; /* Smaller font */
-                }
+                /* --- Tables --- */
+                .compact-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
                 
-                /* Variable Name Column */
                 .compact-table td:first-child { 
                     width: 30%; 
-                    color: var(--vscode-symbolIcon-variableForeground, #75beff); /* VS Code Blue */
+                    color: var(--vscode-symbolIcon-variableForeground, #75beff); 
                     font-weight: 600;
                     vertical-align: top;
                     padding: 2px 5px 2px 0;
                     border-right: 1px solid var(--vscode-tree-indentGuidesStroke, #333);
                 }
                 
-                /* Value Column */
                 .compact-table td:last-child { 
                     padding: 2px 0 2px 8px;
                     vertical-align: top;
+                    white-space: pre-wrap; 
                     word-wrap: break-word;
-                    white-space: pre-wrap;
-                    color: var(--vscode-debugTokenExpression-string, #ce9178); /* VS Code String colorish */
+                    word-break: break-all;
+                    color: var(--vscode-debugTokenExpression-string, #ce9178); 
                     font-family: "Consolas", "Courier New", monospace;
                 }
                 
-                /* Row borders */
-                .compact-table tr {
-                    border-bottom: 1px solid var(--vscode-tree-indentGuidesStroke, #2a2a2a);
-                }
+                .compact-table tr { border-bottom: 1px solid var(--vscode-tree-indentGuidesStroke, #2a2a2a); }
                 .compact-table tr:last-child { border-bottom: none; }
 
-                #varsDisplay { display: none; }
+                /* --- Expansion Styles --- */
+                .clickable-value {
+                    cursor: pointer;
+                    border-bottom: 1px dotted var(--vscode-editor-foreground); 
+                }
                 
-                /* --- Key/Legend --- */
+                .clickable-value:hover {
+                    background-color: rgba(255, 255, 255, 0.05);
+                }
+
+                .compact-table td.expanded {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    border-bottom: none; 
+                }
+
+                #varsDisplay { display: none; }
                 #key { padding: 5px; font-size: 11px; color: var(--vscode-descriptionForeground); background-color: var(--vscode-sideBar-background); border-top: 1px solid var(--vscode-sideBar-border, #333); text-align: center; flex-shrink: 0; }
                 #key span { display: inline-block; margin-right: 10px; }
                 .arrow-icon { font-size: 14px; font-weight: bold; margin-right: 3px; position: relative; top: 1px;}
-                
                 body.loading #main, body.loading #controls { opacity: 0.5; }
             </style>
         </head>
         <body>
             <div id="errorDisplay"></div>
             
-            <div id="inputArea">
+            <div id="inputArea" style="display: ${showConfigArea ? 'block' : 'none'}">
+                
                 <div id="inputSection" style="display: ${initialShowInputBox ? 'block' : 'none'}">
                     <h4>Program Input</h4>
                     <textarea id="inputBox" rows="3"></textarea>
                 </div>
                 
-                <div id="standardControls" style="display: ${initialHasRandomness ? 'none' : 'flex'}">
+                <div id="standardControls" style="display: ${showStandardBtn ? 'flex' : 'none'}">
                     <button id="rerunStandardBtn">Re-run Visualization</button>
                 </div>
 
@@ -487,7 +455,6 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 let currentIndex = -1;
                 let currentSeed = 42; 
 
-                // UI Elements
                 const inputArea = document.getElementById('inputArea');
                 const inputSection = document.getElementById('inputSection'); 
                 const errorDisplay = document.getElementById('errorDisplay');
@@ -512,7 +479,31 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 const outputDisplay = document.getElementById('outputDisplay');
                 const outputContent = document.getElementById('outputContent');
                 
-                // --- RESIZER LOGIC (Height Only) ---
+                const MAX_VAR_LENGTH = 80;
+
+                // --- IN-PLACE EXPANSION LOGIC ---
+                document.body.addEventListener('click', function(event) {
+                    const target = event.target.closest('.clickable-value');
+                    if (target) {
+                        const encodedFull = target.getAttribute('data-full-value');
+                        if (encodedFull) {
+                            const fullValue = decodeURIComponent(encodedFull);
+                            
+                            if (target.classList.contains('expanded')) {
+                                // Collapse
+                                const truncated = fullValue.substring(0, MAX_VAR_LENGTH) + '...';
+                                target.textContent = truncated;
+                                target.classList.remove('expanded');
+                            } else {
+                                // Expand
+                                target.textContent = fullValue;
+                                target.classList.add('expanded');
+                            }
+                        }
+                    }
+                });
+                
+                // --- RESIZER LOGIC ---
                 let isResizingHeight = false;
                 outputResizer.addEventListener('mousedown', (e) => { 
                     isResizingHeight = true; 
@@ -558,23 +549,31 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     const step = trace[currentIndex];
                     const funcName = step.func_name;
                     
-                    // Render Globals (Compact)
+                    // Render Globals
                     let globalsHtml = '<h4>Global Variables</h4>';
                     const globalVars = step.global_vars;
                     if (globalVars && Object.keys(globalVars).length > 0) {
                         globalsHtml += '<table class="compact-table"><tbody>';
                         for (const key in globalVars) {
                             if (key.startsWith('__') || key === 'MockStdin' || key === 'safe_serialize' || key === 'tracer' || key === 'EchoingStringIO' || key === 'random') { continue; }
-                            const value = globalVars[key];
+                            
+                            const value = String(globalVars[key]);
                             const safeKey = key.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                            const safeValue = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                            globalsHtml += \`<tr><td>\${safeKey}</td><td>\${safeValue}</td></tr>\`;
+                            
+                            if (value.length > MAX_VAR_LENGTH) {
+                                const truncated = value.substring(0, MAX_VAR_LENGTH) + '...';
+                                const encodedFull = encodeURIComponent(value);
+                                globalsHtml += \`<tr><td>\${safeKey}</td><td class="clickable-value" data-full-value="\${encodedFull}">\${truncated}</td></tr>\`;
+                            } else {
+                                const safeValue = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                globalsHtml += \`<tr><td>\${safeKey}</td><td>\${safeValue}</td></tr>\`;
+                            }
                         }
                         globalsHtml += '</tbody></table>';
                     } else { globalsHtml += '<span style="font-size:11px; opacity:0.6;">No global variables.</span>'; }
                     globalsDisplay.innerHTML = globalsHtml;
 
-                    // Render Locals (Compact)
+                    // Render Locals
                     if (funcName !== '<module>') {
                         varsDisplay.style.display = 'block';
                         let varsHtml = '<h4>Local Variables (' + funcName + ')</h4>';
@@ -582,10 +581,17 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                         if (localVars && Object.keys(localVars).length > 0) {
                             varsHtml += '<table class="compact-table"><tbody>';
                             for (const key in localVars) {
-                                const value = localVars[key];
+                                const value = String(localVars[key]);
                                 const safeKey = key.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                                const safeValue = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                                varsHtml += \`<tr><td>\${safeKey}</td><td>\${safeValue}</td></tr>\`;
+                                
+                                if (value.length > MAX_VAR_LENGTH) {
+                                    const truncated = value.substring(0, MAX_VAR_LENGTH) + '...';
+                                    const encodedFull = encodeURIComponent(value);
+                                    varsHtml += \`<tr><td>\${safeKey}</td><td class="clickable-value" data-full-value="\${encodedFull}">\${truncated}</td></tr>\`;
+                                } else {
+                                    const safeValue = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                    varsHtml += \`<tr><td>\${safeKey}</td><td>\${safeValue}</td></tr>\`;
+                                }
                             }
                             varsHtml += '</tbody></table>';
                         } else { varsHtml += '<span style="font-size:11px; opacity:0.6;">No local variables.</span>'; }
@@ -605,14 +611,25 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     try { trace = newTraceData ? JSON.parse(newTraceData) : []; } catch (e) { trace = []; errorData = "Error parsing trace data: " + e; }
                     errorData = newErrorData;
                     
+                    // --- 1. Toggle the overall Config Area ---
+                    const showConfig = newShowInputBox || newHasRandomness;
+                    inputArea.style.display = showConfig ? 'block' : 'none';
+
+                    // --- 2. Toggle the Input Text Section ---
                     inputSection.style.display = newShowInputBox ? 'block' : 'none';
 
+                    // --- 3. Toggle Button Groups ---
                     if (newHasRandomness) {
                         standardControls.style.display = 'none';
                         randomControls.style.display = 'flex';
                     } else {
-                        standardControls.style.display = 'flex';
                         randomControls.style.display = 'none';
+                        // Only show standard button if we need inputs
+                        if (newShowInputBox) {
+                            standardControls.style.display = 'flex';
+                        } else {
+                            standardControls.style.display = 'none';
+                        }
                     }
                     
                     if (errorData) {
