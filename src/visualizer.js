@@ -167,27 +167,31 @@ function runTracerAndPostUpdate() {
 
     const tracerProcess = spawn(
         pythonCommand,
-        [tracerPath, allInputs, scriptPath, currentSeed],
+        [tracerPath, allInputs, scriptPath, currentSeed], 
         { cwd: scriptDir }
     );
 
-    const TIMEOUT_MS = 3000;
+    // --- Safety Net Timeout ---
+    // Python handles the 10s timeout internally. 
+    // We wait 10s here to allow plenty of time for JSON serialization.
+    const SAFETY_TIMEOUT_MS = 10000; 
     const killTimer = setTimeout(() => {
         if (!tracerProcess.killed) {
-            tracerProcess.kill();
+            tracerProcess.kill(); 
             if (visualizerPanel) {
                 visualizerPanel.webview.postMessage({
                     command: 'updateTrace',
                     sourceCode: sourceCode,
                     traceData: "[]",
-                    errorData: "Error: Execution timed out (infinite loop?).\nScript took longer than 3 seconds.",
+                    errorData: "Error: Process hung indefinitely (likely blocking I/O or sleep) and was killed.",
                     currentInputs: allInputs,
                     showInputBox: showInputBox,
                     hasRandomness: hasRandomness
                 });
             }
         }
-    }, TIMEOUT_MS);
+    }, SAFETY_TIMEOUT_MS);
+    // --------------------------
 
     let traceDataJson = '';
     let errorData = '';
@@ -196,7 +200,7 @@ function runTracerAndPostUpdate() {
     tracerProcess.stderr.on('data', (data) => { errorData += data.toString(); });
 
     tracerProcess.on('close', (code) => {
-        clearTimeout(killTimer);
+        clearTimeout(killTimer); 
         if (!visualizerPanel || tracerProcess.killed) return;
 
         const EXIT_CODE_SUCCESS = 0;
@@ -217,7 +221,7 @@ function runTracerAndPostUpdate() {
             visualizerPanel.webview.postMessage({
                 command: 'updateTrace',
                 sourceCode: sourceCode,
-                traceData: traceDataJson,
+                traceData: traceDataJson, 
                 errorData: errorData,
                 currentInputs: allInputs,
                 showInputBox: showInputBox,
@@ -237,7 +241,7 @@ function runTracerAndPostUpdate() {
             });
         }
     });
-   
+    
     tracerProcess.stdin.write(sourceCode);
     tracerProcess.stdin.end();
 }

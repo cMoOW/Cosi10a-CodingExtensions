@@ -3,10 +3,18 @@ import json
 import io
 import os
 import random 
+import time
 
 redirected_stdout = io.StringIO()
 execution_trace = []
 main_filename = None
+start_time = time.time()
+
+# --- LIMITS ---
+TIME_LIMIT = 5.0      # <--- UPDATED: Stop execution after 5 seconds
+MAX_STEPS = 2000      # Stop execution after 2000 steps
+step_counter = 0      
+# --------------
 
 class EchoingStringIO:
     def __init__(self, input_str):
@@ -21,7 +29,6 @@ class EchoingStringIO:
         return line
 
 class MockStdin:
-    """A fake stdin that simulates a user pressing 'Enter'."""
     def readline(self):
         return "\n"
 
@@ -44,6 +51,16 @@ def safe_serialize(obj):
 def tracer(frame, event, arg):
     global redirected_stdout
     global main_filename
+    global step_counter
+
+    # --- Check Limits ---
+    step_counter += 1
+    if step_counter > MAX_STEPS:
+        raise TimeoutError(f"Execution exceeded {MAX_STEPS} steps.")
+        
+    if time.time() - start_time > TIME_LIMIT:
+        raise TimeoutError(f"Execution exceeded {TIME_LIMIT} seconds.")
+    # --------------------
 
     if event == 'call':
         try:
@@ -56,8 +73,7 @@ def tracer(frame, event, arg):
         
         return tracer 
     
-
-    if event == 'line': 
+    if event == 'line':
         output = redirected_stdout.getvalue()
         redirected_stdout.seek(0)
         redirected_stdout.truncate(0)
@@ -86,9 +102,8 @@ def tracer(frame, event, arg):
     
     return tracer
 
-# --- Main script execution ---
 if __name__ == "__main__":
-   # global main_filename
+    #global main_filename
 
     EXIT_CODE_SUCCESS = 0
     EXIT_CODE_RUNTIME_ERROR = 1
@@ -142,7 +157,7 @@ if __name__ == "__main__":
     except Exception as e:
         sys.stdout = original_stdout 
         sys.stdin = original_stdin 
-        print(f"Error during script execution: {e}", file=sys.stderr)
+        print(f"Trace Stopped: {e}", file=sys.stderr)
         final_exit_code = EXIT_CODE_RUNTIME_ERROR
         
     finally:
