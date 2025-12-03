@@ -253,13 +253,19 @@ function deactivate() {
 
 /**
  * Generates the full HTML/CSS/JS "shell" for the Webview.
+ * @param {string} sourceCode
+ * @param {string} traceData
+ * @param {string} currentInputs
+ * @param {string | null} errorData
+ * @param {boolean} initialShowInputBox
+ * @param {boolean} initialHasRandomness
  */
 function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, initialShowInputBox, initialHasRandomness) {
-   
+    
     const safeSourceCode = JSON.stringify(sourceCode);
     const safeErrorData = JSON.stringify(errorData || null);
     const safeCurrentInputs = JSON.stringify(currentInputs);
-   
+    
     return `
         <!DOCTYPE html>
         <html lang="en">
@@ -268,108 +274,136 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Python Visualizer</title>
             <style>
-                body {
+                /* --- Base Styles --- */
+                body { 
                     font-family: var(--vscode-font-family);
                     font-size: var(--vscode-font-size);
-                    display: flex;
-                    flex-direction: column;
-                    height: 100vh;
-                    margin: 0;
+                    display: flex; 
+                    flex-direction: column; 
+                    height: 100vh; 
+                    margin: 0; 
                     color: var(--vscode-editor-foreground);
                     background-color: var(--vscode-editor-background);
                 }
                 h4 { margin-top: 0; }
-               
+                
                 #errorDisplay { padding: 10px; background-color: #5c2121; border-bottom: 1px solid var(--vscode-sideBar-border, #333); }
                 #errorDisplay h4 { margin: 0 0 5px 0; color: #ffcccc; }
                 #errorDisplay pre { white-space: pre-wrap; color: white; margin: 0; }
-               
+                
+                /* --- Config Area --- */
                 #inputArea { padding: 10px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); }
                 #inputSection h4 { margin: 0 0 5px 0; }
-                #inputBox {
-                    width: calc(100% - 10px);
-                    font-family: "Consolas", "Courier New", monospace;
-                    color: var(--vscode-input-foreground);
-                    background-color: var(--vscode-input-background);
-                    border: 1px solid var(--vscode-input-border);
-                    margin-bottom: 5px;
+                #inputBox { 
+                    width: calc(100% - 10px); 
+                    font-family: "Consolas", "Courier New", monospace; 
+                    color: var(--vscode-input-foreground); 
+                    background-color: var(--vscode-input-background); 
+                    border: 1px solid var(--vscode-input-border); 
+                    margin-bottom: 5px; 
                 }
-               
+                
+                /* --- Buttons --- */
                 #randomControls { display: flex; gap: 10px; margin-top: 8px; }
                 #standardControls { display: flex; margin-top: 8px; }
-               
-                button {
+                
+                button { 
                     background-color: var(--vscode-button-background);
                     color: var(--vscode-button-foreground);
-                    border: none;
-                    padding: 6px 12px;
-                    border-radius: 2px;
-                    cursor: pointer;
+                    border: none; 
+                    padding: 6px 12px; 
+                    border-radius: 2px; 
+                    cursor: pointer; 
                     font-family: var(--vscode-font-family);
                 }
                 button:hover { background-color: var(--vscode-button-hoverBackground); }
                 button:disabled { opacity: 0.5; cursor: not-allowed; }
-               
+                
                 #rerunNewBtn { background-color: #098309; color: white; flex-grow: 1; }
                 #rerunSameBtn { background-color: #007acc; color: white; flex-grow: 1; }
                 #rerunStandardBtn { background-color: #007acc; color: white; flex-grow: 1; }
                 #rerunNewBtn:hover { background-color: #0bc90b; }
                 #rerunSameBtn:hover { background-color: #0098ff; }
 
+                /* --- Playback Controls --- */
                 #controls { padding: 10px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); display: flex; align-items: center; flex-shrink: 0; }
                 #stepLabel { margin: 0 10px; min-width: 100px; text-align: right; }
                 #stepSlider { flex-grow: 1; margin: 0 10px; }
 
-                #main { display: flex; flex: 1; overflow: hidden; }
-                #codeDisplay { display: none; } // Previous code: font-family: "Consolas", "Courier New", monospace; padding: 15px; white-space: pre; overflow-y: auto; width: 60%; border-right: 1px solid var(--vscode-sideBar-border, #333); }
-                #sidebar { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 150px; }
-                // The following line doesn't seem to do improve the display currently
-                // #outputResizer { height: 5px; cursor: row-resize; background-color: var(--vscode-scrollbarSlider-background, #444); transition: background-color 0.2s; flex-shrink: 0; }
-                #sidebarResizer:hover, #outputResizer:hover { background-color: var(--vscode-scrollbarSlider-hoverBackground, #007acc); }
-               
-                #stateContainer { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-height: 50px; }
+                /* --- Main Layout --- */
+                #main { 
+                    display: flex; 
+                    flex: 1; 
+                    overflow: hidden; 
+                    /* No split view anymore, just the one main column */
+                }
+                
+                #sidebar { 
+                    flex: 1; /* Takes full width */
+                    display: flex; 
+                    flex-direction: column; 
+                    overflow: hidden; 
+                    width: 100%;
+                }
+                
+                /* --- Output Resizer (Height Only) --- */
+                #outputResizer { 
+                    height: 5px; 
+                    cursor: row-resize; 
+                    background-color: var(--vscode-scrollbarSlider-background, #444); 
+                    transition: background-color 0.2s; 
+                    flex-shrink: 0; 
+                }
+                #outputResizer:hover { 
+                    background-color: var(--vscode-scrollbarSlider-hoverBackground, #007acc); 
+                }
+                
+                /* --- Panels --- */
+                #stateContainer { 
+                    flex: 1; 
+                    overflow-y: auto; 
+                    display: flex; 
+                    flex-direction: column; 
+                    min-height: 50px; 
+                }
                 #varsDisplay, #globalsDisplay { padding: 15px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); }
                 #stateContainer > div:last-child { border-bottom: none; }
-                #outputDisplay { height: 30%; padding: 15px; overflow-y: auto; font-family: "Consolas", "Courier New", monospace; border-top: 1px solid var(--vscode-sideBar-border, #333); flex-shrink: 0; }
+                
+                #outputDisplay { 
+                    height: 30%; /* Initial height */
+                    padding: 15px; 
+                    overflow-y: auto; 
+                    font-family: "Consolas", "Courier New", monospace; 
+                    border-top: 1px solid var(--vscode-sideBar-border, #333); 
+                    flex-shrink: 0; 
+                }
                 #outputContent { white-space: pre-wrap; }
-               
+                
+                /* --- Tables --- */
                 #varsTable, #globalsTable { width: 100%; border-collapse: collapse; table-layout: fixed; }
                 #varsTable th, #globalsTable th { text-align: left; padding: 4px 8px; border-bottom: 2px solid var(--vscode-sideBar-border, #333); }
                 #varsTable td, #globalsTable td { padding: 4px 8px; border-bottom: 1px solid var(--vscode-sideBar-border, #333); vertical-align: top; word-wrap: break-word; white-space: pre-wrap; }
                 #varsTable td:first-child, #globalsTable td:first-child { width: 35%; font-weight: bold; }
                 #varsTable tr:last-child td, #globalsTable tr:last-child td { border-bottom: none; }
                 #varsDisplay { display: none; }
-                .highlight-line { background-color: var(--vscode-editor-selectionBackground, rgba(255, 255, 0, 0.3)); }
-                body.loading #main, body.loading #controls { opacity: 0.5; }
                 
-                #key {
-                    padding: 10px;
-                    font-size: 14px;
-                    color: var(--vscode-editor-foreground);
-                    background-color: var(--vscode-sideBar-background);
-                    border-top: 1px solid var(--vscode-sideBar-border, #333);
-                    text-align: center;
-                }
-                #key span {
-                    display: inline-block;
-                    margin-right: 15px;
-                }
-                .arrow-icon {
-                    font-size: 40 px;
-                    font-weight: bold;
-                    margin-right: 5px;
-                }
+                /* --- Key/Legend --- */
+                #key { padding: 10px; font-size: 14px; color: var(--vscode-editor-foreground); background-color: var(--vscode-sideBar-background); border-top: 1px solid var(--vscode-sideBar-border, #333); text-align: center; flex-shrink: 0; }
+                #key span { display: inline-block; margin-right: 15px; }
+                .arrow-icon { font-size: 16px; font-weight: bold; margin-right: 5px; }
+                
+                body.loading #main, body.loading #controls { opacity: 0.5; }
             </style>
         </head>
         <body>
             <div id="errorDisplay"></div>
-
+            
             <div id="inputArea">
                 <div id="inputSection" style="display: ${initialShowInputBox ? 'block' : 'none'}">
                     <h4>Program Input</h4>
                     <textarea id="inputBox" rows="3"></textarea>
                 </div>
-               
+                
                 <div id="standardControls" style="display: ${initialHasRandomness ? 'none' : 'flex'}">
                     <button id="rerunStandardBtn">Re-run Visualization</button>
                 </div>
@@ -379,23 +413,23 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     <button id="rerunSameBtn" title="Run with the same random seed (Same outcome)">Re-run (Same Outcome)</button>
                 </div>
             </div>
-           
+            
             <div id="controls">
                 <button id="prevBtn">« Prev</button>
                 <input type="range" id="stepSlider" value="0" min="0" max="0" />
                 <button id="nextBtn">Next »</button>
                 <span id="stepLabel">Step: 0 / 0</span>
             </div>
-           
+            
             <div id="main">
-                <div id="codeDisplay"></div>
-                <div id="sidebarResizer"></div>
                 <div id="sidebar">
                     <div id="stateContainer">
                         <div id="globalsDisplay"></div>
                         <div id="varsDisplay"></div>
                     </div>
+                    
                     <div id="outputResizer"></div>
+
                     <div id="outputDisplay">
                         <h4>Program Output</h4>
                         <pre id="outputContent"></pre>
@@ -410,34 +444,33 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
 
             <script>
                 const vscode = acquireVsCodeApi();
-               
+                
                 let sourceCode = ${safeSourceCode};
                 let trace = ${traceData};
                 let errorData = ${safeErrorData};
                 let showInputBox = ${initialShowInputBox};
                 let hasRandomness = ${initialHasRandomness};
                 let currentIndex = -1;
-                let currentSeed = 42;
-                let codeLines = sourceCode.split('\\n');
+                let currentSeed = 42; 
 
+                // UI Elements
                 const inputArea = document.getElementById('inputArea');
-                const inputSection = document.getElementById('inputSection');
+                const inputSection = document.getElementById('inputSection'); 
                 const errorDisplay = document.getElementById('errorDisplay');
                 const inputBox = document.getElementById('inputBox');
-               
+                
                 const standardControls = document.getElementById('standardControls');
                 const randomControls = document.getElementById('randomControls');
                 const rerunStandardBtn = document.getElementById('rerunStandardBtn');
                 const rerunNewBtn = document.getElementById('rerunNewBtn');
                 const rerunSameBtn = document.getElementById('rerunSameBtn');
-               
+                
                 const prevBtn = document.getElementById('prevBtn');
                 const nextBtn = document.getElementById('nextBtn');
                 const stepLabel = document.getElementById('stepLabel');
                 const stepSlider = document.getElementById('stepSlider');
-               
-                const codeDisplay = document.getElementById('codeDisplay');
-                const sidebarResizer = document.getElementById('sidebarResizer');
+                
+                // Layout Elements
                 const sidebar = document.getElementById('sidebar');
                 const stateContainer = document.getElementById('stateContainer');
                 const globalsDisplay = document.getElementById('globalsDisplay');
@@ -445,34 +478,42 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 const outputResizer = document.getElementById('outputResizer');
                 const outputDisplay = document.getElementById('outputDisplay');
                 const outputContent = document.getElementById('outputContent');
-               
-                let isResizingWidth = false;
+                
+                // --- RESIZER LOGIC (Height Only) ---
                 let isResizingHeight = false;
-                sidebarResizer.addEventListener('mousedown', (e) => { isResizingWidth = true; document.body.style.cursor = 'col-resize'; e.preventDefault(); });
-                outputResizer.addEventListener('mousedown', (e) => { isResizingHeight = true; document.body.style.cursor = 'row-resize'; e.preventDefault(); });
+                outputResizer.addEventListener('mousedown', (e) => { 
+                    isResizingHeight = true; 
+                    document.body.style.cursor = 'row-resize'; 
+                    e.preventDefault(); 
+                });
+
                 document.addEventListener('mousemove', (e) => {
-                    if (isResizingWidth) {
-                        const mainRect = document.getElementById('main').getBoundingClientRect();
-                        const newCodeWidth = e.clientX - mainRect.left;
-                        if (newCodeWidth > 100 && newCodeWidth < mainRect.width - 150) { codeDisplay.style.width = newCodeWidth + 'px'; }
-                    }
                     if (isResizingHeight) {
                         const sidebarRect = sidebar.getBoundingClientRect();
                         const newOutputHeight = sidebarRect.bottom - e.clientY;
-                        if (newOutputHeight > 50 && newOutputHeight < sidebarRect.height - 50) { outputDisplay.style.height = newOutputHeight + 'px'; }
+                        
+                        // Constraints: Min height 50px for output, min height 50px for vars
+                        if (newOutputHeight > 30 && newOutputHeight < sidebarRect.height - 50) { 
+                            outputDisplay.style.height = newOutputHeight + 'px'; 
+                        }
                     }
                 });
+
                 document.addEventListener('mouseup', () => {
-                    if (isResizingWidth || isResizingHeight) { isResizingWidth = false; isResizingHeight = false; document.body.style.cursor = 'default'; }
+                    if (isResizingHeight) { 
+                        isResizingHeight = false; 
+                        document.body.style.cursor = 'default'; 
+                    }
                 });
-               
+                // --- END RESIZER LOGIC ---
+                
                 function render() {
                     prevBtn.disabled = (currentIndex <= 0);
                     nextBtn.disabled = (currentIndex >= trace.length - 1);
                     stepLabel.textContent = \`Step: \${currentIndex + 1} / \${trace.length}\`;
                     if (stepSlider) { stepSlider.value = currentIndex; }
-                   
-                    // --- NEW: Sync with Editor ---
+                    
+                    // Sync with Editor (This is critical now that we removed codeDisplay)
                     if (currentIndex >= 0 && currentIndex < trace.length) {
                         const step = trace[currentIndex];
                         const prevLine = currentIndex > 0 ? trace[currentIndex - 1].line_no : null;
@@ -482,22 +523,13 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                             prevLine: prevLine
                         });
                     }
-                    // -----------------------------
 
                     if (currentIndex < 0 || currentIndex >= trace.length) return;
-                   
+                    
                     const step = trace[currentIndex];
-                    const currentLine = step.line_no;
                     const funcName = step.func_name;
-
-                    let codeHtml = '';
-                    for (let i = 0; i < codeLines.length; i++) {
-                        const lineClass = (i + 1 === currentLine) ? 'highlight-line' : '';
-                        const lineText = codeLines[i].replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        codeHtml += \`<div class="\${lineClass}">\${lineText || '&nbsp;'}</div>\`;
-                    }
-                    codeDisplay.innerHTML = codeHtml;
-                   
+                    
+                    // Render Globals
                     let globalsHtml = '<h4>Global Variables</h4>';
                     const globalVars = step.global_vars;
                     if (globalVars && Object.keys(globalVars).length > 0) {
@@ -513,6 +545,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     } else { globalsHtml += '<span>No global variables in this step.</span>'; }
                     globalsDisplay.innerHTML = globalsHtml;
 
+                    // Render Locals
                     if (funcName !== '<module>') {
                         varsDisplay.style.display = 'block';
                         let varsHtml = '<h4>Local Variables</h4>';
@@ -530,6 +563,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                         varsDisplay.innerHTML = varsHtml;
                     } else { varsDisplay.style.display = 'none'; varsDisplay.innerHTML = ''; }
 
+                    // Render Output
                     let cumulativeOutput = '';
                     for (let i = 0; i <= currentIndex; i++) {
                         if (trace[i].output) { cumulativeOutput += trace[i].output; }
@@ -541,8 +575,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     sourceCode = newSourceCode;
                     try { trace = newTraceData ? JSON.parse(newTraceData) : []; } catch (e) { trace = []; errorData = "Error parsing trace data: " + e; }
                     errorData = newErrorData;
-                    codeLines = sourceCode.split('\\n');
-                   
+                    
                     inputSection.style.display = newShowInputBox ? 'block' : 'none';
 
                     if (newHasRandomness) {
@@ -552,12 +585,12 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                         standardControls.style.display = 'flex';
                         randomControls.style.display = 'none';
                     }
-                   
+                    
                     if (errorData) {
                         errorDisplay.innerHTML = \`<h4>Tracer Failed:</h4><pre>\${errorData}</pre>\`;
                         errorDisplay.style.display = 'block';
                     } else { errorDisplay.style.display = 'none'; }
-                   
+                    
                     if (trace.length > 0) {
                         stepSlider.max = trace.length - 1;
                         stepSlider.disabled = false;
@@ -568,13 +601,12 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                         prevBtn.disabled = true;
                         nextBtn.disabled = true;
                         stepSlider.disabled = true;
-                        codeDisplay.innerHTML = '';
                         varsDisplay.style.display = 'none';
                         globalsDisplay.innerHTML = '<h4>Global Variables</h4>';
                         outputContent.textContent = '';
                     }
                 }
-               
+                
                 window.addEventListener('message', event => {
                     const message = event.data;
                     switch (message.command) {
@@ -590,23 +622,23 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 prevBtn.onclick = () => { if (currentIndex > 0) { currentIndex--; render(); } };
                 nextBtn.onclick = () => { if (currentIndex < trace.length - 1) { currentIndex++; render(); } };
                 stepSlider.oninput = () => { currentIndex = parseInt(stepSlider.value, 10); render(); };
-               
+                
                 rerunStandardBtn.onclick = () => {
                     const inputText = inputBox.value;
-                    const safeInput = inputText.replace(/\\n/g, '\\\\n');
+                    const safeInput = inputText.replace(/\\n/g, '\\\\n'); 
                     vscode.postMessage({ command: 'rerun', text: safeInput, seed: currentSeed });
                 };
 
                 rerunNewBtn.onclick = () => {
                     const inputText = inputBox.value;
-                    const safeInput = inputText.replace(/\\n/g, '\\\\n');
+                    const safeInput = inputText.replace(/\\n/g, '\\\\n'); 
                     currentSeed = Math.floor(Math.random() * 100000);
                     vscode.postMessage({ command: 'rerun', text: safeInput, seed: currentSeed });
                 };
 
                 rerunSameBtn.onclick = () => {
                     const inputText = inputBox.value;
-                    const safeInput = inputText.replace(/\\n/g, '\\\\n');
+                    const safeInput = inputText.replace(/\\n/g, '\\\\n'); 
                     vscode.postMessage({ command: 'rerun', text: safeInput, seed: currentSeed });
                 };
 
