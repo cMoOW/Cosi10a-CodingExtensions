@@ -93,9 +93,8 @@ function createOrShowPanel() {
     );
     
     const iconPath = vscode.Uri.file(
-        path.join(extensionContext.extensionPath, 'src', 'arrow_icon_next.png')
+        path.join(extensionContext.extensionPath, 'src', 'green_bug.png')
     );
-    vscode.window.showInformationMessage('Icon Path:', iconPath.toString());
     visualizerPanel.iconPath = iconPath;
 
     associatedDocument = editor.document;

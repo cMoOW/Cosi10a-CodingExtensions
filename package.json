@@ -59,7 +59,7 @@
       },
       {
         "command": "visualizer.start",
-        "title": "Start Code Visualizer"
+        "title": "Code Visualizer"
       }
     ],
     "menus": {
@@ -77,7 +77,8 @@
         {
           "command": "visualizer.start",
           "when": "editorLangId == python",
-          "group": "navigation"
+          "group": "navigation",
+          "icon": "bug"
         }
       ]
     }

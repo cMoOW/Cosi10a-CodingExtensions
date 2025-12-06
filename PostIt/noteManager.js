@@ -1053,7 +1053,7 @@ Sent from VS Code Post-It Extension
                 body {
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     padding: 20px;
-                    background: #1f1f1f;
+                    background: var(--vscode-sideBar-background);
                     min-height: 100vh;
                 }
                 .container {
@@ -1402,7 +1402,7 @@ Sent from VS Code Post-It Extension
         </head>
         <body>
             <div class="container">
-            <h1 style="display: flex; justify-content: space-between; align-items: center; color: white;">
+            <h1 style="display: flex; justify-content: space-between; align-items: center; color: var(--vscode-descriptionForeground);">
                 <span>My PostIts</span>
                 ${
                   this.notes.length > 0
