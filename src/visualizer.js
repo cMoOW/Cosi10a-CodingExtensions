@@ -45,11 +45,11 @@ function activate(context) {
         // Green arrow
         gutterIconPath: path.join(__dirname, 'arrow_icon_next.png'), 
         gutterIconSize: 'contain', 
-        backgroundColor: 'rgba(255, 255, 0, 0.3)', // light yellow
+        backgroundColor: 'rgba(255, 255, 0, 0.15)', // light yellow
         isWholeLine: true,
     });
     noArrowDecorationType = vscode.window.createTextEditorDecorationType({
-        backgroundColor: 'rgba(255, 255, 0, 0.3)', // light yellow
+        backgroundColor: 'rgba(255, 255, 0, 0.15)', // light yellow
         isWholeLine: true,
     });
     // ----------------------------------------------------------
