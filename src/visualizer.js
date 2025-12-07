@@ -45,13 +45,11 @@ function activate(context) {
         // Green arrow
         gutterIconPath: path.join(__dirname, 'arrow_icon_next.png'), 
         gutterIconSize: 'contain', 
-        // Light green highlight
-        backgroundColor: 'rgba(77, 255, 0, 0.1)',
+        backgroundColor: 'rgba(255, 255, 0, 0.3)', // light yellow
         isWholeLine: true,
     });
     noArrowDecorationType = vscode.window.createTextEditorDecorationType({
-        // Light green highlight
-        backgroundColor: 'rgba(77, 255, 0, 0.1)',
+        backgroundColor: 'rgba(255, 255, 0, 0.3)', // light yellow
         isWholeLine: true,
     });
     // ----------------------------------------------------------
@@ -63,7 +61,7 @@ function activate(context) {
         if (editor && editor.document.languageId === 'python') {
             if (editor.document.uri !== associatedDocument.uri) {
                 associatedDocument = editor.document;
-                currentInput = "";
+                //currentInput = "";
                 currentSeed = "42";
                 runTracerAndPostUpdate();
             }
