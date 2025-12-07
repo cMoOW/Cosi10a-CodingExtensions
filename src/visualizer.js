@@ -87,12 +87,6 @@ function createOrShowPanel() {
         'pythonVisualizer', 'Python Visualizer', vscode.ViewColumn.Beside,
         { enableScripts: true, retainContextWhenHidden: true }
     );
-    
-    const iconPath = vscode.Uri.file(
-        path.join(extensionContext.extensionPath, 'src', 'arrow_icon_next.png')
-    );
-    vscode.window.showInformationMessage('Icon Path:', iconPath.toString());
-    visualizerPanel.iconPath = iconPath;
 
     const iconPath = vscode.Uri.file(
         path.join(extensionContext.extensionPath, 'src', 'arrow_icon_next.png')
@@ -121,29 +115,25 @@ function createOrShowPanel() {
 
                 const line = message.line;
                 const prevLine = message.prevLine;
-                // Find the editor that matches our document
-                const editor = vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === associatedDocument.uri.toString());
+                const editor = vscode.window.visibleTextEditors.find(
+                    e => associatedDocument && e.document.uri.toString() === associatedDocument.uri.toString()
+                );
 
                 if (editor && line > 0) {
                     curr = line - 1;
-                    // VS Code uses 0-based indexing, Python trace is 1-based
                     const range = new vscode.Range(line - 1, 0, line - 1, 0);
-                    // Apply the appropriate decoration based on whether arrows are enabled
                     if (arrowsEnabled) {
                         editor.setDecorations(nextDecorationType, [range]);
                     } else {
                         editor.setDecorations(noArrowDecorationType, [range]);
                     }
-                    // Optionally, scroll to that line so it's always visible
                     editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
                 }
-                
+
                 if (editor && prevLine && prevLine > 0) {
                     prev = prevLine - 1;
                     if (arrowsEnabled) {
                         const prevRange = new vscode.Range(prevLine - 1, 0, prevLine - 1, 0);
-                        
-                        // Apply the appropriate decoration based on whether arrows are enabled
                         editor.setDecorations(prevDecorationType, [prevRange]);
                     }
                 }
@@ -443,7 +433,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 .compact-table td.expanded { background-color: rgba(255, 255, 255, 0.05); border-bottom: none; }
 
                 #varsDisplay { display: none; }
-                /* --- Key Section --- */
+
                 #key {
                     padding: 5px;
                     font-size: 11px;
@@ -453,45 +443,15 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     text-align: center;
                     flex-shrink: 0;
                     display: flex;
-                    justify-content: space-between; /* Distribute space between arrows and checkbox */
+                    justify-content: space-between;
                     align-items: center;
                 }
+                #key span { display: inline-block; margin-right: 10px; }
+                #key #toggleArrows { display: flex; align-items: center; justify-content: flex-end; flex-grow: 1; }
+                #key label { cursor: pointer; font-size: 12px; padding-left: 5px; }
+                #key input[type="checkbox"] { margin-right: 5px; }
+                .arrow-icon { font-size: 20px; font-weight: bold; margin-right: 3px; position: relative; top: 1px; }
 
-                #key span {
-                    display: inline-block;
-                    margin-right: 10px;
-                }
-
-                #key #toggleArrows {
-                    display: flex;
-                    align-items: center;
-                    justify-content: flex-end; /* Align checkbox to the right */
-                    flex-grow: 1; /* Allow it to take remaining space */
-                }
-
-                #key label {
-                    cursor: pointer;
-                    font-size: 12px;
-                    padding-left: 5px;
-                }
-
-                .arrow-icon {
-                    font-size: 20px; /* Increase size of arrows */
-                    font-weight: bold;
-                    margin-right: 3px;
-                    position: relative;
-                    top: 1px;
-                }
-
-                #key input[type="checkbox"] {
-                    margin-right: 5px;
-                }
-
-                #key input[type="checkbox"]:disabled {
-                    opacity: 0.5;
-                    cursor: not-allowed;
-                }
-                .arrow-icon { font-size: 14px; font-weight: bold; margin-right: 3px; position: relative; top: 1px;}
                 body.loading #main, body.loading #controls { opacity: 0.5; }
             </style>
         </head>
@@ -586,27 +546,32 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
 
                 const MAX_VAR_LENGTH = 80;
 
-                document.getElementById('arrowsCheckbox').addEventListener('change', function() {
-                    const isChecked = this.checked;
-
-                    // Disable or enable the arrows functionality
-                    const toggleArrowsButton = document.getElementById('toggleArrows');
-                    const arrowsEnabled = isChecked;
-
-                    if (arrowsEnabled) {
-                        toggleArrowsButton.setAttribute('data-arrows-enabled', 'true');
-                    } else {
-                        toggleArrowsButton.setAttribute('data-arrows-enabled', 'false');
+                function syncEditor() {
+                    if (!isEditorSynced) return;
+                    if (currentIndex >= 0 && currentIndex < trace.length) {
+                        const step = trace[currentIndex];
+                        const prevLine = currentIndex > 0 ? trace[currentIndex - 1].line_no : null;
+                        vscode.postMessage({
+                            command: 'syncLine',
+                            line: step.line_no,
+                            prevLine: prevLine,
+                            isEditorSynced: isEditorSynced
+                        });
                     }
+                }
 
-                    // Notify VS Code to update the arrows visibility
-                    vscode.postMessage({
-                        command: 'toggleArrows',
-                        enabled: arrowsEnabled
-                    });
+                // Enable sync immediately on press inside the panel
+                document.addEventListener('mousedown', (e) => {
+                    if (!isEditorSynced) {
+                        isEditorSynced = true;
+                        syncEditor();
+                    }
+                }, { capture: true });
+
+                document.getElementById('arrowsCheckbox').addEventListener('change', function() {
+                    vscode.postMessage({ command: 'toggleArrows', enabled: this.checked });
                 });
 
-                // --- IN-PLACE EXPANSION LOGIC ---
                 document.body.addEventListener('click', function(event) {
                     const target = event.target.closest('.clickable-value');
                     if (target) {
