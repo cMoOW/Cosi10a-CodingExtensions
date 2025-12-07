@@ -12,7 +12,7 @@ start_time = time.time()
 
 # --- LIMITS ---
 TIME_LIMIT = 5.0      # <--- UPDATED: Stop execution after 5 seconds
-MAX_STEPS = 2000      # Stop execution after 2000 steps
+MAX_STEPS = 5000      # Stop execution after 2000 steps
 step_counter = 0      
 # --------------
 

@@ -95,7 +95,7 @@ function createOrShowPanel() {
     const iconPath = vscode.Uri.file(
         path.join(extensionContext.extensionPath, 'src', 'arrow_icon_next.png')
     );
-    vscode.window.showInformationMessage('Icon Path:', iconPath.toString());
+    //vscode.window.showInformationMessage('Icon Path:', iconPath.toString());
     visualizerPanel.iconPath = iconPath;
 
     associatedDocument = editor.document;
