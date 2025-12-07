@@ -13,6 +13,8 @@ let extensionContext = undefined;
 // --- NEW: Decoration Type for the Editor Highlight ---
 let prevDecorationType = undefined;
 let nextDecorationType = undefined;
+// No arrows decoration:
+let noArrowDecorationType = undefined;
 
 // --- Helpers ---
 function checkCodeForInput(sourceCode) {
@@ -47,8 +49,13 @@ function activate(context) {
         backgroundColor: 'rgba(77, 255, 0, 0.1)',
         isWholeLine: true,
     });
+    noArrowDecorationType = vscode.window.createTextEditorDecorationType({
+        // Light green highlight
+        backgroundColor: 'rgba(77, 255, 0, 0.1)',
+        isWholeLine: true,
+    });
     // ----------------------------------------------------------
-
+    
     let startCommand = vscode.commands.registerCommand('visualizer.start', createOrShowPanel);
     let changeListener = vscode.workspace.onDidChangeTextDocument(onDocumentChange);
     let tabChangeListener = vscode.window.onDidChangeActiveTextEditor(editor => {
@@ -56,7 +63,7 @@ function activate(context) {
         if (editor && editor.document.languageId === 'python') {
             if (editor.document.uri !== associatedDocument.uri) {
                 associatedDocument = editor.document;
-                currentInput = "";
+                //currentInput = "";
                 currentSeed = "42";
                 runTracerAndPostUpdate();
             }
@@ -67,6 +74,9 @@ function activate(context) {
 
 function createOrShowPanel() {
     const editor = vscode.window.activeTextEditor;
+    let curr = 0;
+    let prev = undefined;
+    let arrowsEnabled = true; // Default show arrows
     if (!editor || editor.document.languageId !== 'python') {
         vscode.window.showErrorMessage('Please open a Python file to visualize.');
         return;
@@ -81,6 +91,12 @@ function createOrShowPanel() {
         'pythonVisualizer', 'Python Visualizer', vscode.ViewColumn.Beside,
         { enableScripts: true, retainContextWhenHidden: true }
     );
+    
+    const iconPath = vscode.Uri.file(
+        path.join(extensionContext.extensionPath, 'src', 'arrow_icon_next.png')
+    );
+    //vscode.window.showInformationMessage('Icon Path:', iconPath.toString());
+    visualizerPanel.iconPath = iconPath;
 
     associatedDocument = editor.document;
     currentInput = "";
@@ -99,32 +115,64 @@ function createOrShowPanel() {
                 if (message.seed) currentSeed = message.seed;
                 runTracerAndPostUpdate();
             }
-            // --- NEW: Handle Line Syncing ---
+            // --- Handle Line Syncing ---
             else if (message.command === 'syncLine') {
+                if (!message.isEditorSynced) return;
                 const line = message.line;
                 const prevLine = message.prevLine;
                 // Find the editor that matches our document
                 const editor = vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === associatedDocument.uri.toString());
-               
+
                 if (editor && line > 0) {
+                    curr = line - 1;
                     // VS Code uses 0-based indexing, Python trace is 1-based
                     const range = new vscode.Range(line - 1, 0, line - 1, 0);
-                   
-                    // Apply decoration
-                    editor.setDecorations(nextDecorationType, [range]);
-                   
-                    // Optional: Scroll to that line so it's always visible
+                    // Apply the appropriate decoration based on whether arrows are enabled
+                    if (arrowsEnabled) {
+                        editor.setDecorations(nextDecorationType, [range]);
+                    } else {
+                        editor.setDecorations(noArrowDecorationType, [range]);
+                    }
+                    // Optionally, scroll to that line so it's always visible
                     editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
                 }
+                
                 if (editor && prevLine && prevLine > 0) {
-                    const prevRange = new vscode.Range(prevLine - 1, 0, prevLine - 1, 0);
-                    editor.setDecorations(prevDecorationType, [prevRange]);
-                    editor.revealRange(prevRange, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+                    prev = prevLine - 1;
+                    if (arrowsEnabled) {
+                        const prevRange = new vscode.Range(prevLine - 1, 0, prevLine - 1, 0);
+                        
+                        // Apply the appropriate decoration based on whether arrows are enabled
+                        editor.setDecorations(prevDecorationType, [prevRange]);
+                    }
                 }
             }
-            // --------------------------------
+            // --- Handle Arrows Toggle ---
+            else if (message.command === 'toggleArrows') {
+                arrowsEnabled = message.enabled;  // Update the arrows state
+                
+                // Optionally, clear the current decorations if arrows are disabled
+                if (editor) {
+                    if (!arrowsEnabled) {
+                        // Clear both arrow decorations when disabled
+                        editor.setDecorations(prevDecorationType, []);
+                        editor.setDecorations(nextDecorationType, []);
+                        const range = new vscode.Range(curr, 0, curr, 0);
+                        editor.setDecorations(noArrowDecorationType, [range]);
+                    } else {
+                        editor.setDecorations(noArrowDecorationType, []);
+                        const range = new vscode.Range(curr, 0, curr, 0);
+                        editor.setDecorations(nextDecorationType, [range]);
+                        if (prev) {
+                            const range = new vscode.Range(prev, 0, prev, 0);
+                            editor.setDecorations(prevDecorationType, [range]);
+                        }
+                    }
+                }
+            }
         },
-        undefined, extensionContext.subscriptions
+        undefined,
+        extensionContext.subscriptions
     );
 
     visualizerPanel.onDidDispose(() => {
@@ -134,6 +182,8 @@ function createOrShowPanel() {
         // Clear decorations when panel closes
         if (vscode.window.activeTextEditor) {
             vscode.window.activeTextEditor.setDecorations(nextDecorationType, []);
+            vscode.window.activeTextEditor.setDecorations(prevDecorationType, []);
+            vscode.window.activeTextEditor.setDecorations(noArrowDecorationType, []);
         }
         clearTimeout(debounceTimer);
     }, undefined, extensionContext.subscriptions);
@@ -143,6 +193,15 @@ function createOrShowPanel() {
 
 function onDocumentChange(event) {
     if (!visualizerPanel || event.document.uri !== associatedDocument.uri) return;
+    // --- NEW: Clear decorations immediately on edit ---
+    const editor = vscode.window.activeTextEditor;
+    if (editor && editor.document === event.document) {
+        editor.setDecorations(nextDecorationType, []);
+        editor.setDecorations(prevDecorationType, []);
+        if (noArrowDecorationType) {
+            editor.setDecorations(noArrowDecorationType, []);
+        }
+    }
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
         associatedDocument = event.document;
@@ -270,10 +329,8 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
     const safeErrorData = JSON.stringify(errorData || null);
     const safeCurrentInputs = JSON.stringify(currentInputs);
     
-    // Logic: Only show the main container if we have inputs OR randomness
+    // Config Visibility Logic
     const showConfigArea = initialShowInputBox || initialHasRandomness;
-    
-    // Logic: Only show standard re-run if we have inputs BUT NO randomness
     const showStandardBtn = initialShowInputBox && !initialHasRandomness;
 
     return `
@@ -341,7 +398,15 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
 
                 /* --- Main Layout --- */
                 #main { display: flex; flex: 1; overflow: hidden; }
-                #sidebar { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
+                
+                /* We removed #codeDisplay, so sidebar takes full width */
+                #sidebar { 
+                    flex: 1; 
+                    display: flex; 
+                    flex-direction: column; 
+                    overflow: hidden; 
+                    width: 100%; 
+                }
                 
                 /* --- Resizer --- */
                 #outputResizer { height: 4px; cursor: row-resize; background-color: var(--vscode-scrollbarSlider-background, #444); transition: background-color 0.2s; flex-shrink: 0; }
@@ -385,20 +450,30 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     cursor: pointer;
                     border-bottom: 1px dotted var(--vscode-editor-foreground); 
                 }
-                
-                .clickable-value:hover {
-                    background-color: rgba(255, 255, 255, 0.05);
-                }
-
-                .compact-table td.expanded {
-                    background-color: rgba(255, 255, 255, 0.05);
-                    border-bottom: none; 
-                }
+                .clickable-value:hover { background-color: rgba(255, 255, 255, 0.05); }
+                .compact-table td.expanded { background-color: rgba(255, 255, 255, 0.05); border-bottom: none; }
 
                 #varsDisplay { display: none; }
-                #key { padding: 5px; font-size: 11px; color: var(--vscode-descriptionForeground); background-color: var(--vscode-sideBar-background); border-top: 1px solid var(--vscode-sideBar-border, #333); text-align: center; flex-shrink: 0; }
+                
+                /* --- Key Section --- */
+                #key {
+                    padding: 5px;
+                    font-size: 11px;
+                    color: var(--vscode-descriptionForeground);
+                    background-color: var(--vscode-sideBar-background);
+                    border-top: 1px solid var(--vscode-sideBar-border, #333);
+                    text-align: center;
+                    flex-shrink: 0;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
                 #key span { display: inline-block; margin-right: 10px; }
-                .arrow-icon { font-size: 14px; font-weight: bold; margin-right: 3px; position: relative; top: 1px;}
+                #key #toggleArrows { display: flex; align-items: center; justify-content: flex-end; flex-grow: 1; }
+                #key label { cursor: pointer; font-size: 12px; padding-left: 5px; }
+                #key input[type="checkbox"] { margin-right: 5px; }
+                .arrow-icon { font-size: 20px; font-weight: bold; margin-right: 3px; position: relative; top: 1px; }
+                
                 body.loading #main, body.loading #controls { opacity: 0.5; }
             </style>
         </head>
@@ -406,7 +481,6 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
             <div id="errorDisplay"></div>
             
             <div id="inputArea" style="display: ${showConfigArea ? 'block' : 'none'}">
-                
                 <div id="inputSection" style="display: ${initialShowInputBox ? 'block' : 'none'}">
                     <h4>Program Input</h4>
                     <textarea id="inputBox" rows="3"></textarea>
@@ -444,8 +518,14 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
             </div>
             
             <div id="key">
-                <span><span class="arrow-icon" style="color: #009dff;">→</span> Just executed</span>
-                <span><span class="arrow-icon" style="color: #66d900;">→</span> Next to execute</span>
+                <div>
+                    <span><span class="arrow-icon" style="color: #009dff;">→</span> Just executed</span>
+                    <span><span class="arrow-icon" style="color: #66d900;">→</span> Next to execute</span>
+                </div>
+                <div id="toggleArrows">
+                    <input type="checkbox" id="arrowsCheckbox" checked />
+                    <label for="arrowsCheckbox">Display arrows</label>
+                </div>
             </div>
 
             <script>
@@ -458,6 +538,10 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 let hasRandomness = ${initialHasRandomness};
                 let currentIndex = -1;
                 let currentSeed = 42; 
+                
+                // --- NEW STATE: Syncing enabled? ---
+                let isEditorSynced = false; 
+                // -----------------------------------
 
                 const inputArea = document.getElementById('inputArea');
                 const inputSection = document.getElementById('inputSection'); 
@@ -485,21 +569,50 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 
                 const MAX_VAR_LENGTH = 80;
 
-                // --- IN-PLACE EXPANSION LOGIC ---
+                // --- HELPER: Send Sync Message ---
+                // --- HELPER: Send Sync Message ---
+                function syncEditor() {
+                    if (currentIndex >= 0 && currentIndex < trace.length) {
+                        const step = trace[currentIndex];
+                        const prevLine = currentIndex > 0 ? trace[currentIndex - 1].line_no : null;
+                        vscode.postMessage({
+                            command: 'syncLine',
+                            line: step.line_no,
+                            prevLine: prevLine,
+                            isEditorSynced: isEditorSynced   // <-- send flag to extension
+                        });
+                    }
+                }
+
+
+                // --- LISTENERS ---
+                
+                // 1. CLICK LISTENER (Enable Sync on interaction)
+                document.addEventListener('mouse', (e) => {
+                    // Use capture phase (true) to run this BEFORE button handlers
+                    if (!isEditorSynced) {
+                        isEditorSynced = true;
+                        // Force an immediate sync for the current step
+                        syncEditor(); 
+                    }
+                }, { capture: true });
+
+                document.getElementById('arrowsCheckbox').addEventListener('change', function() {
+                    const isChecked = this.checked;
+                    vscode.postMessage({ command: 'toggleArrows', enabled: isChecked });
+                });
+
                 document.body.addEventListener('click', function(event) {
                     const target = event.target.closest('.clickable-value');
                     if (target) {
                         const encodedFull = target.getAttribute('data-full-value');
                         if (encodedFull) {
                             const fullValue = decodeURIComponent(encodedFull);
-                            
                             if (target.classList.contains('expanded')) {
-                                // Collapse
                                 const truncated = fullValue.substring(0, MAX_VAR_LENGTH) + '...';
                                 target.textContent = truncated;
                                 target.classList.remove('expanded');
                             } else {
-                                // Expand
                                 target.textContent = fullValue;
                                 target.classList.add('expanded');
                             }
@@ -507,7 +620,6 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     }
                 });
                 
-                // --- RESIZER LOGIC ---
                 let isResizingHeight = false;
                 outputResizer.addEventListener('mousedown', (e) => { 
                     isResizingHeight = true; 
@@ -526,10 +638,7 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                 });
 
                 document.addEventListener('mouseup', () => {
-                    if (isResizingHeight) { 
-                        isResizingHeight = false; 
-                        document.body.style.cursor = 'default'; 
-                    }
+                    if (isResizingHeight) { isResizingHeight = false; document.body.style.cursor = 'default'; }
                 });
                 
                 function render() {
@@ -538,15 +647,11 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     stepLabel.textContent = \`Step: \${currentIndex + 1} / \${trace.length}\`;
                     if (stepSlider) { stepSlider.value = currentIndex; }
                     
-                    if (currentIndex >= 0 && currentIndex < trace.length) {
-                        const step = trace[currentIndex];
-                        const prevLine = currentIndex > 0 ? trace[currentIndex - 1].line_no : null;
-                        vscode.postMessage({
-                            command: 'syncLine',
-                            line: step.line_no,
-                            prevLine: prevLine
-                        });
+                    // --- CHANGED: Only sync if flag is TRUE ---
+                    if (isEditorSynced) {
+                        syncEditor();
                     }
+                    // ------------------------------------------
 
                     if (currentIndex < 0 || currentIndex >= trace.length) return;
                     
@@ -560,7 +665,6 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                         globalsHtml += '<table class="compact-table"><tbody>';
                         for (const key in globalVars) {
                             if (key.startsWith('__') || key === 'MockStdin' || key === 'safe_serialize' || key === 'tracer' || key === 'EchoingStringIO' || key === 'random') { continue; }
-                            
                             const value = String(globalVars[key]);
                             const safeKey = key.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                             
@@ -615,20 +719,20 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
                     try { trace = newTraceData ? JSON.parse(newTraceData) : []; } catch (e) { trace = []; errorData = "Error parsing trace data: " + e; }
                     errorData = newErrorData;
                     
-                    // --- 1. Toggle the overall Config Area ---
+                    // --- RESET SYNC ON UPDATE ---
+                    // When code is edited/updated, we stop syncing until the user interacts.
+                    isEditorSynced = false;
+                    // ----------------------------
+
                     const showConfig = newShowInputBox || newHasRandomness;
                     inputArea.style.display = showConfig ? 'block' : 'none';
-
-                    // --- 2. Toggle the Input Text Section ---
                     inputSection.style.display = newShowInputBox ? 'block' : 'none';
 
-                    // --- 3. Toggle Button Groups ---
                     if (newHasRandomness) {
                         standardControls.style.display = 'none';
                         randomControls.style.display = 'flex';
                     } else {
                         randomControls.style.display = 'none';
-                        // Only show standard button if we need inputs
                         if (newShowInputBox) {
                             standardControls.style.display = 'flex';
                         } else {
@@ -694,6 +798,9 @@ function getVisualizerHtml(sourceCode, traceData, currentInputs, errorData, init
 
                 const initialInputs = ${safeCurrentInputs};
                 inputBox.value = initialInputs.replace(/\\\\n/g, '\\n');
+                
+                // Initial Load: Allow immediate sync so the arrows appear when you first open the panel
+                isEditorSynced = true; 
                 updateUI(sourceCode, JSON.stringify(trace), errorData, initialInputs, showInputBox, hasRandomness);
             </script>
         </body>
