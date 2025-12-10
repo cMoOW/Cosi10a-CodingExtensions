@@ -1402,7 +1402,7 @@ Sent from VS Code Post-It Extension
         </head>
         <body>
             <div class="container">
-            <h1 style="display: flex; justify-content: space-between; align-items: center; color: var(--vscode-descriptionForeground);">
+            <h1 style="display: flex; justify-content: space-between; align-items: center; color: var(--vscode-editor-foreground);">
                 <span>My PostIts</span>
                 ${
                   this.notes.length > 0
