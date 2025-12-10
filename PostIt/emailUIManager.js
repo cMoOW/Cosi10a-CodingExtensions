@@ -115,8 +115,8 @@ class EmailUIManager {
           padding: 10px;
           border-radius: 4px;
           border: 1px solid var(--vscode-input-border);
-          background: var(--vscode-input-background);
-          color: var(--vscode-input-foreground);
+          background: var(--vscode-editor-background);
+          color: var(--vscode-editor-foreground);
           font-size: 14px;
           line-height: 1.4;
           margin-bottom: 0;
@@ -136,11 +136,11 @@ class EmailUIManager {
         }
 
         .select-box {
-          background: var(--vscode-dropdown-background);
+          background: var(--vscode-editor-background);
           border: 1px solid var(--vscode-dropdown-border);
           padding: 10px;
           border-radius: 4px;
-          color: var(--vscode-dropdown-foreground);
+          color: var(--vscode-editor-foreground);
           cursor: pointer;
           user-select: none;
           overflow: hidden;
