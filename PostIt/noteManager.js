@@ -52,12 +52,12 @@ class NoteManager {
   /**
    * Add a new note
    * @param {string} message - The note content
-   * @param {Object} options - Optional editor context
-   * @param {string} options.highlightedCode - Selected code (optional)
-   * @param {string} options.fullCode - Full document code (optional)
-   * @param {string} options.filePath - File path (optional)
-   * @param {string} options.fileName - File name (optional)
-   * @param {string} options.language - Language (optional)
+   * @param {Object} [options={}] - Optional editor context
+   * @param {string} [options.highlightedCode] - Selected code (optional)
+   * @param {string} [options.fullCode] - Full document code (optional)
+   * @param {string} [options.filePath] - File path (optional)
+   * @param {string} [options.fileName] - File name (optional)
+   * @param {string} [options.language] - Language (optional)
    */
   async addNote(message, options = {}) {
     if (message && message.trim()) {
@@ -111,7 +111,11 @@ class NoteManager {
             language: options.language || (editor ? editor.document.languageId : null)
           };
 
-          await createNote(noteData);
+          const ticket = await createNote(noteData);
+          // Store the ticket ID in the local note for sync purposes
+          if (ticket && ticket.id) {
+            newNote.ticketId = ticket.id;
+          }
           console.log("Note saved to Supabase database");
         }
       } catch (error) {
@@ -361,6 +365,17 @@ Sent from VS Code Post-It Extension
         this.notes = this.notes.filter((n) => n.id !== noteId);
         await this.saveNotes();
 
+        // If note has a ticket ID, close the ticket in the database
+        if (deletedNote && deletedNote.ticketId) {
+          try {
+            await this.closeTicket(deletedNote.ticketId);
+            console.log(`Ticket ${deletedNote.ticketId} closed after note deletion`);
+          } catch (error) {
+            console.error("Error closing ticket when deleting note:", error);
+            // Don't show error to user - note deletion succeeded
+          }
+        }
+
         // Offer Undo option
         vscode.window
           .showInformationMessage("Note deleted.", "Undo")
@@ -368,6 +383,15 @@ Sent from VS Code Post-It Extension
             if (selection === "Undo" && deletedNote) {
               this.notes.push(deletedNote);
               await this.saveNotes();
+              // If ticket was closed, reopen it
+              if (deletedNote.ticketId) {
+                try {
+                  await this.reopenTicket(deletedNote.ticketId);
+                  console.log(`Ticket ${deletedNote.ticketId} reopened after note undo`);
+                } catch (error) {
+                  console.error("Error reopening ticket:", error);
+                }
+              }
               vscode.window.showInformationMessage("Note restored.");
               panel.webview.html = this.getWebviewContent(); // Refresh view
             }
@@ -384,6 +408,21 @@ Sent from VS Code Post-It Extension
         }
 
         const deletedNotesBackup = [...this.notes]; // backup for undo
+        
+        // Close all tickets associated with notes
+        const ticketIds = deletedNotesBackup
+          .filter(note => note.ticketId)
+          .map(note => note.ticketId);
+        
+        if (ticketIds.length > 0) {
+          try {
+            await Promise.all(ticketIds.map(ticketId => this.closeTicket(ticketId)));
+            console.log(`Closed ${ticketIds.length} tickets after deleting all notes`);
+          } catch (error) {
+            console.error("Error closing tickets when deleting all notes:", error);
+          }
+        }
+
         this.notes = [];
         await this.saveNotes();
         panel.webview.html = this.getWebviewContent();
@@ -393,6 +432,15 @@ Sent from VS Code Post-It Extension
             if (selection === "Undo") {
               this.notes = deletedNotesBackup;
               await this.saveNotes();
+              // Reopen all tickets
+              if (ticketIds.length > 0) {
+                try {
+                  await Promise.all(ticketIds.map(ticketId => this.reopenTicket(ticketId)));
+                  console.log(`Reopened ${ticketIds.length} tickets after undo`);
+                } catch (error) {
+                  console.error("Error reopening tickets:", error);
+                }
+              }
               vscode.window.showInformationMessage("All notes restored.");
               panel.webview.html = this.getWebviewContent();
             }
@@ -1826,6 +1874,68 @@ Sent from VS Code Post-It Extension
     this.notes = this.loadNotes();
     console.log("Notes refreshed. Total notes:", this.notes.length);
     return this.notes.length;
+  }
+
+  /**
+   * Close a ticket in the database when a note is deleted
+   * @param {string} ticketId - UUID of the ticket to close
+   */
+  async closeTicket(ticketId) {
+    try {
+      const { getSupabase } = require("../src/supabaseClient");
+      const supabase = getSupabase();
+      
+      const { data, error } = await supabase
+        .from('tickets')
+        .update({ 
+          status: 'closed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', ticketId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error closing ticket:", error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Error in closeTicket:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reopen a ticket in the database when a note is restored
+   * @param {string} ticketId - UUID of the ticket to reopen
+   */
+  async reopenTicket(ticketId) {
+    try {
+      const { getSupabase } = require("../src/supabaseClient");
+      const supabase = getSupabase();
+      
+      const { data, error } = await supabase
+        .from('tickets')
+        .update({ 
+          status: 'open',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', ticketId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error reopening ticket:", error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Error in reopenTicket:", error);
+      throw error;
+    }
   }
 }
 

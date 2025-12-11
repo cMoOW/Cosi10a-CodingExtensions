@@ -1,6 +1,5 @@
 -- ticket_feedback_schema.sql
 -- Database schema for ticket feedback table
--- Run this in your Supabase SQL editor
 
 -- Create ticket_feedback table
 CREATE TABLE IF NOT EXISTS ticket_feedback (

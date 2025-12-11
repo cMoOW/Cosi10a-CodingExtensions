@@ -100,6 +100,8 @@ class TicketViewer {
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to refresh: ${error.message}`);
         }
+      } else if (message.type === 'closeTicket') {
+        await this.closeTicket(message.ticketId, studentEmail);
       }
     });
   }
@@ -124,6 +126,95 @@ class TicketViewer {
     } catch (error) {
       console.error('Error fetching ticket details:', error);
       vscode.window.showErrorMessage(`Failed to load ticket: ${error.message}`);
+    }
+  }
+
+  /**
+   * Close a ticket and save to post-it note
+   */
+  async closeTicket(ticketId, studentEmail) {
+    try {
+      // First get the ticket and feedback
+      const { ticket, feedback } = await getStudentTicketWithFeedback(ticketId, studentEmail);
+      
+      // Check if ticket is resolved before allowing close
+      if (ticket.status !== 'resolved') {
+        vscode.window.showWarningMessage('You can only close tickets that have been resolved by a TA.');
+        return;
+      }
+
+      // Close the ticket in the database
+      const { closeStudentTicket } = require('../src/view-tickets');
+      await closeStudentTicket(ticketId, studentEmail);
+
+      // Save ticket content and feedback to a post-it note
+      const { NoteManager } = require('./noteManager');
+      const noteManager = new NoteManager(this.context);
+      
+      // Refresh notes to ensure we have the latest
+      await noteManager.refreshNotes();
+      
+      // Check if there's already a note linked to this ticket
+      const existingNote = noteManager.notes.find(note => note.ticketId === ticketId);
+      
+      // Create a combined note with ticket message and TA feedback
+      let noteContent = `Ticket: ${ticket.message}\n\n`;
+      
+      if (feedback.length > 0) {
+        noteContent += 'TA Feedback:\n';
+        feedback.forEach((item, index) => {
+          noteContent += `\n${index + 1}. ${item.ta_email} (${new Date(item.created_at).toLocaleString()}):\n`;
+          noteContent += `${item.feedback_text}\n`;
+        });
+      } else {
+        noteContent += 'No feedback received.\n';
+      }
+
+      // Add ticket info
+      noteContent += `\n---\nTicket ID: ${ticket.id.substring(0, 8)}\n`;
+      noteContent += `Created: ${new Date(ticket.created_at).toLocaleString()}\n`;
+      noteContent += `Closed: ${new Date().toLocaleString()}\n`;
+      if (ticket.highlighted_code) {
+        noteContent += `\nCode:\n${ticket.highlighted_code}`;
+      }
+
+      if (existingNote) {
+        // Update existing note
+        existingNote.content = noteContent.trim();
+        existingNote.timestamp = new Date().toISOString();
+        await noteManager.saveNotes();
+        // Refresh the panel if it's open
+        if (noteManager.activePanel) {
+          noteManager.activePanel.webview.html = noteManager.getWebviewContent();
+        }
+      } else {
+        // Create new note with ticket ID stored
+        const newNote = await noteManager.addNote(noteContent.trim(), {
+          highlightedCode: ticket.highlighted_code || null,
+          fullCode: ticket.full_code || null,
+          filePath: ticket.file_path || null,
+          fileName: ticket.file_name || null,
+          language: ticket.language || null
+        });
+        // Store the ticket ID in the note
+        if (newNote) {
+          const noteIndex = noteManager.notes.findIndex(n => n.id === newNote.id);
+          if (noteIndex !== -1) {
+            noteManager.notes[noteIndex].ticketId = ticketId;
+            await noteManager.saveNotes();
+          }
+        }
+      }
+
+      vscode.window.showInformationMessage('Ticket closed and saved to post-it notes!');
+
+      // Refresh the ticket list
+      this.currentTickets = await getStudentTickets(studentEmail);
+      this.showTicketList(studentEmail);
+
+    } catch (error) {
+      console.error('Error closing ticket:', error);
+      vscode.window.showErrorMessage(`Failed to close ticket: ${error.message}`);
     }
   }
 
@@ -219,7 +310,6 @@ class TicketViewer {
             font-weight: 500;
           }
           .status-open { background: #4CAF50; color: white; }
-          .status-in_progress { background: #2196F3; color: white; }
           .status-resolved { background: #9E9E9E; color: white; }
           .status-closed { background: #424242; color: white; }
           .priority-low { background: #81C784; color: white; }
@@ -333,7 +423,6 @@ class TicketViewer {
             font-weight: 500;
           }
           .status-open { background: #4CAF50; color: white; }
-          .status-in_progress { background: #2196F3; color: white; }
           .status-resolved { background: #9E9E9E; color: white; }
           .status-closed { background: #424242; color: white; }
           .priority-low { background: #81C784; color: white; }
@@ -433,10 +522,36 @@ class TicketViewer {
           ${feedbackHTML}
         </div>
 
+        ${ticket.status === 'resolved' ? `
+          <div class="close-ticket-section" style="margin-top: 30px; padding: 20px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 6px;">
+            <h3 style="margin-top: 0; color: var(--vscode-textLink-foreground);">Ticket Resolved</h3>
+            <p style="color: var(--vscode-foreground); margin-bottom: 15px;">
+              This ticket has been marked as resolved by a TA. You can close it and save the ticket content and feedback to your post-it notes.
+            </p>
+            <button id="closeTicketBtn" class="close-ticket-btn" onclick="closeTicket()" style="
+              padding: 10px 20px;
+              background: var(--vscode-button-background);
+              color: var(--vscode-button-foreground);
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              font-weight: 600;
+            ">Close Ticket & Save to Post-It</button>
+          </div>
+        ` : ''}
+
         <script>
           const vscode = acquireVsCodeApi();
           function backToList() {
             vscode.postMessage({ type: 'backToList' });
+          }
+          function closeTicket() {
+            const btn = document.getElementById('closeTicketBtn');
+            if (btn) {
+              btn.disabled = true;
+              btn.textContent = 'Closing...';
+            }
+            vscode.postMessage({ type: 'closeTicket', ticketId: '${ticket.id}' });
           }
         </script>
       </body>

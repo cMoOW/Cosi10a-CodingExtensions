@@ -11,9 +11,8 @@ export default function FilterBar({ filters, onFilterChange }) {
 
   const clearFilters = () => {
     onFilterChange({
-      status: '',
+      status: 'open', // Default to open tickets
       assignedTo: '',
-      priority: '',
       studentEmail: ''
     });
   };
@@ -25,28 +24,11 @@ export default function FilterBar({ filters, onFilterChange }) {
       <div className="filter-group">
         <label>Status:</label>
         <select 
-          value={filters.status || ''} 
+          value={filters.status || 'open'} 
           onChange={(e) => handleChange('status', e.target.value)}
         >
-          <option value="">All</option>
           <option value="open">Open</option>
-          <option value="in_progress">In Progress</option>
           <option value="resolved">Resolved</option>
-          <option value="closed">Closed</option>
-        </select>
-      </div>
-
-      <div className="filter-group">
-        <label>Priority:</label>
-        <select 
-          value={filters.priority || ''} 
-          onChange={(e) => handleChange('priority', e.target.value)}
-        >
-          <option value="">All</option>
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="urgent">Urgent</option>
         </select>
       </div>
 
