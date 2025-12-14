@@ -1,11 +1,11 @@
 {
-  "name": "python-lint",
-  "displayName": "Python Linter",
-  "description": "A work in progress version of a python linter extension",
+  "name": "cosi10a-coding-tools",
+  "displayName": "COSI10a Coding Tools",
+  "description": "COSI10a coding tools including post-it notes, ticketing, and code visualizer.",
   "version": "0.0.1",
   "publisher": "Jacob, SiMing, Brian, Apoorva",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.104.0"
   },
   "repository": {
     "type": "git",
