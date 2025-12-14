@@ -2,20 +2,14 @@
 
 This is a group project to design and build **custom VS Code extensions** that streamline the workflow for students in an **Introduction to Python course** 
 
-The goal is to make it easier for students to install tools, follow style guides, and submit assignments with minimal setup, so they can focus on learning Python instead of fighting with their environment.
+This extension includes functionality for post-it notes and ticketing as well a Python Tutor-esque debugger. 
+
 
 ---
-
-## Project Goals
-- Provide a **ready-to-use VS Code environment** for Python courses.  
-- Simplify setup for new students (extensions, linters, formatters, GitHub Classroom integration).  
-- Add features that help with common student pain points:
-  - Enforcing naming conventions (snake_case, etc.).  
-  - One-click homework submission.  
-  - Integrated code formatting and linting.  
-  - Helpful templates or starter files.  
-
----
+## Install extension
+  ```bash
+  code --install-extension cosi10a-coding-tools-0.0.1.vsix
+  ```
 
 ## Setup 
 
@@ -29,5 +23,14 @@ The goal is to make it easier for students to install tools, follow style guides
    ```bash
    npm install
    ```
+
+## Setup ticketing site
+.env files and their locations are located [here](https://docs.google.com/document/d/1qGK9lfGB3GZfk1AVvSGVn2wnjvT_sybWK_cWcHCqkGk/edit?usp=sharing)
+
+  ```bash
+  cd TicketingUI/frontend
+  npm install
+  npm run dev
+  ```
 
 
