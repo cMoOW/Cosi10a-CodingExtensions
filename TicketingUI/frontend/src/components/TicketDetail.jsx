@@ -2,12 +2,11 @@
 // Full ticket view with all details and TA interaction
 
 import React, { useState, useEffect } from 'react';
-import { getTicketWithFeedback, updateTicketStatus, assignTicket, updateTicketPriority } from '../services/ticketService';
+import { getTicketWithFeedback, updateTicketStatus, assignTicket } from '../services/ticketService';
 import CodeViewer from './CodeViewer';
 import FeedbackForm from './FeedbackForm';
 import FeedbackList from './FeedbackList';
 import StatusBadge from './StatusBadge';
-import PriorityBadge from './PriorityBadge';
 import './TicketDetail.css';
 
 export default function TicketDetail({ ticketId, currentTAEmail, onBack, onUpdate }) {
@@ -39,9 +38,11 @@ export default function TicketDetail({ ticketId, currentTAEmail, onBack, onUpdat
   async function handleStatusChange(newStatus) {
     try {
       setUpdating(true);
-      const updated = await updateTicketStatus(ticketId, newStatus, currentTAEmail);
+      const updated = await updateTicketStatus(ticketId, newStatus, currentTAEmail || 'ta@brandeis.edu');
       setTicket(updated);
       if (onUpdate) onUpdate();
+      // Refresh ticket details to get latest data
+      await fetchTicketDetails();
     } catch (err) {
       console.error('Error updating status:', err);
       alert('Failed to update status: ' + err.message);
@@ -59,20 +60,6 @@ export default function TicketDetail({ ticketId, currentTAEmail, onBack, onUpdat
     } catch (err) {
       console.error('Error assigning ticket:', err);
       alert('Failed to assign ticket: ' + err.message);
-    } finally {
-      setUpdating(false);
-    }
-  }
-
-  async function handlePriorityChange(newPriority) {
-    try {
-      setUpdating(true);
-      const updated = await updateTicketPriority(ticketId, newPriority);
-      setTicket(updated);
-      if (onUpdate) onUpdate();
-    } catch (err) {
-      console.error('Error updating priority:', err);
-      alert('Failed to update priority: ' + err.message);
     } finally {
       setUpdating(false);
     }
@@ -114,7 +101,6 @@ export default function TicketDetail({ ticketId, currentTAEmail, onBack, onUpdat
         <button onClick={onBack} className="back-btn">← Back to List</button>
         <div className="header-actions">
           <StatusBadge status={ticket.status} />
-          <PriorityBadge priority={ticket.priority} />
         </div>
       </div>
 
@@ -200,23 +186,7 @@ export default function TicketDetail({ ticketId, currentTAEmail, onBack, onUpdat
                 disabled={updating}
               >
                 <option value="open">Open</option>
-                <option value="in_progress">In Progress</option>
                 <option value="resolved">Resolved</option>
-                <option value="closed">Closed</option>
-              </select>
-            </div>
-
-            <div className="action-group">
-              <label>Priority:</label>
-              <select 
-                value={ticket.priority} 
-                onChange={(e) => handlePriorityChange(e.target.value)}
-                disabled={updating}
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
               </select>
             </div>
 
@@ -265,6 +235,30 @@ export default function TicketDetail({ ticketId, currentTAEmail, onBack, onUpdat
             taEmail={currentTAEmail}
             onFeedbackAdded={handleFeedbackAdded}
           />
+          {/* Mark as Resolved Button - only show if ticket is not already resolved/closed */}
+          {ticket.status !== 'resolved' && ticket.status !== 'closed' && feedback.length > 0 && (
+            <div style={{ marginTop: '15px' }}>
+              <button 
+                onClick={() => handleStatusChange('resolved')}
+                disabled={updating}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}
+              >
+                {updating ? 'Updating...' : '✓ Mark as Resolved'}
+              </button>
+              <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+                Click this button to mark the ticket as resolved after providing feedback.
+              </p>
+            </div>
+          )}
         </section>
       </div>
     </div>

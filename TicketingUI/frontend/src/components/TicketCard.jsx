@@ -3,7 +3,6 @@
 
 import React from 'react';
 import StatusBadge from './StatusBadge';
-import PriorityBadge from './PriorityBadge';
 import './TicketCard.css';
 
 export default function TicketCard({ ticket, onClick }) {
@@ -25,7 +24,6 @@ export default function TicketCard({ ticket, onClick }) {
           <h3>Ticket #{ticket.id.substring(0, 8)}</h3>
           <div className="badge-group">
             <StatusBadge status={ticket.status} />
-            <PriorityBadge priority={ticket.priority} />
           </div>
         </div>
       </div>

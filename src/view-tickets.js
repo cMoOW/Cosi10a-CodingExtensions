@@ -22,10 +22,13 @@ async function getStudentTickets(studentEmail) {
 
   if (error) {
     console.error('Error fetching student tickets:', error);
-    throw new Error(`Failed to fetch tickets: ${error.message}`);
+    // Return empty array instead of throwing to prevent UI crashes
+    // This handles cases where tickets might have been deleted or database errors occur
+    return [];
   }
 
-  return data || [];
+  // Filter out null/undefined entries and return valid tickets
+  return (data || []).filter(ticket => ticket !== null && ticket !== undefined);
 }
 
 /**
@@ -52,6 +55,10 @@ async function getStudentTicketWithFeedback(ticketId, studentEmail) {
 
   if (ticketError) {
     console.error('Error fetching ticket:', ticketError);
+    // Handle case where ticket might have been deleted
+    if (ticketError.code === 'PGRST116' || ticketError.message?.includes('not found')) {
+      throw new Error('Ticket not found. It may have been deleted.');
+    }
     throw new Error(`Failed to fetch ticket: ${ticketError.message}`);
   }
 
@@ -119,9 +126,58 @@ async function getUnreadFeedbackCount(studentEmail) {
   return count || 0;
 }
 
+/**
+ * Close a ticket by a student (only if ticket is resolved)
+ * @param {string} ticketId - UUID of the ticket
+ * @param {string} studentEmail - Student's email (for verification)
+ * @returns {Promise<Object>} Updated ticket object
+ */
+async function closeStudentTicket(ticketId, studentEmail) {
+  if (!studentEmail || !studentEmail.endsWith('@brandeis.edu')) {
+    throw new Error('Valid Brandeis student email is required');
+  }
+
+  const supabase = getSupabase();
+
+  // First verify the ticket belongs to the student and is resolved
+  const { data: ticket, error: ticketError } = await supabase
+    .from('tickets')
+    .select('*')
+    .eq('id', ticketId)
+    .eq('student_email', studentEmail)
+    .single();
+
+  if (ticketError || !ticket) {
+    throw new Error('Ticket not found or you do not have permission to close it');
+  }
+
+  if (ticket.status !== 'resolved') {
+    throw new Error('You can only close tickets that have been resolved by a TA');
+  }
+
+  // Update ticket status to closed
+  const { data, error } = await supabase
+    .from('tickets')
+    .update({
+      status: 'closed',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', ticketId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error closing ticket:', error);
+    throw new Error(`Failed to close ticket: ${error.message}`);
+  }
+
+  return data;
+}
+
 module.exports = {
   getStudentTickets,
   getStudentTicketWithFeedback,
-  getUnreadFeedbackCount
+  getUnreadFeedbackCount,
+  closeStudentTicket
 };
 
